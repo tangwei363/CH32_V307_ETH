@@ -1,0 +1,32 @@
+{
+	"details": [
+		{
+			"file": "User/bsp_wch_net.c",
+			"encoding": "gbk"
+		},
+		{
+			"file": "https/fx_enetinf.c",
+			"encoding": "gbk"
+		},
+		{
+			"file": "https/fx_devmon.c",
+			"encoding": "gbk"
+		},
+		{
+			"file": "https/fx_plcinf.c",
+			"encoding": "gbk"
+		},
+		{
+			"file": "https/fx_status.c",
+			"encoding": "gbk"
+		},
+		{
+			"file": "https/index.c",
+			"encoding": "gbk"
+		},
+		{
+			"file": "User/HTTPS.c",
+			"encoding": "gbk"
+		}
+	]
+}

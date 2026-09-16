@@ -1,0 +1,83 @@
+# 可执行文件和镜像
+*.bin
+*.elf
+*.hex
+*.axf
+
+# 压缩文件
+*.zip
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tar
+
+# 编译输出目录（按 Keil 典型结构）
+MDK-ARM/*/Objects/
+MDK-ARM/*/Listings/
+
+# 编译中间文件和日志
+*.obj
+*.o
+*.d
+*.dep
+*.lst
+*.crf
+*.tra
+*.map
+*.sym
+*.plg
+*.rpt
+*.iex
+*.htm
+*.log
+
+# 临时文件和备份
+*.bak
+*.tmp
+*.__i
+*.swp
+*~
+# Windows / macOS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+*.expand
+
+# IDE 配置
+.vscode/
+.idea/
+*.suo
+*.ncb
+*.vcxproj.user
+*.vcxproj.filters
+*.sln
+*.sdf
+
+# Keil 特定文件（用户本地配置）
+*.uvoptx
+*.uvguix*
+*.ddk
+*.edk
+*.lnp
+*.mpf
+*.mpj
+*.omf
+*.dbgconf
+
+# 调试器日志 / 配置（根据喜好保留或删）
+JLinkLog.txt
+ST-Link_log.txt
+JLinkSettings.ini
+
+# 工具配置文件（如果你想一刀切，再加回去）
+# *.cfg
+# *.ini
+# *.db
+
+# 保留重要的文档文件
+!README.md
+!README.txt
+!LICENSE.txt
+!CHANGELOG.md
+
