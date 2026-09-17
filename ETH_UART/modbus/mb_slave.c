@@ -741,6 +741,8 @@ static int mb_process_adu(uint8_t Sour_Sock, uint8_t Dest_Sock,
     uint16_t                dev_index;
     uint16_t                dev_count;      /* 下发给串口命令的"软元件数/字节数" */
     uint16_t                dev_points;     /* 需要访问的位点数或字数              */
+    uint16_t                qty;            /* 归一化"数量": 0x05/0x06 该字段位置存的是
+                                             * 写入值，须按 1 点参与地址校验与点数推导 */
     uint8_t                 area;
     uint8_t                 stage = MB_STAGE_NORMAL;
     uint8_t                 exc;
@@ -799,17 +801,29 @@ static int mb_process_adu(uint8_t Sour_Sock, uint8_t Dest_Sock,
         return 0;
     }
 
-    /* ⑤ 查表：解析 Modbus 地址区间 → 三菱软元件区间(含边界检查)
+    /* ⑤ 归一化"数量"字段
+     *    0x05/0x06 的 PDU 是"功能码+地址+值"，不存在数量字段，其 quantity 位置
+     *    存放的是**写入值**(见 mb_req_t 注释)。该值只能用于回显，绝不能参与
+     *    "按数量推导"的计算，否则：
+     *      - 值 0xFF00(ON) 当数量：addr+0xFF00-1 越过任何映射区间末端 → 误回 0x02
+     *        (实测: FC05 写线圈 0x3300 → 0x3300+0xFF00-1=0x131FF > 0x33FF)
+     *      - 值 0x0000(OFF) 当数量：命中 FindMap 的 qty==0 提前返回 → 同样误回 0x02
+     *    即未归一化时 FC05 无论置位/复位都必然失败，FC06 则表现为"写入值越大越易报错"。
+     *    故此处统一归一化为 qty，供地址校验、点数推导使用；
+     *    而 req.quantity 保持原值不动 —— 写响应需原样回显该值(mb_send_write_echo)。 */
+    qty = mb_is_single_write(req.func) ? 1u : req.quantity;
+
+    /* ⑥ 查表：解析 Modbus 地址区间 → 三菱软元件区间(含边界检查)
      *    规范推荐"数据地址"判定先于"数据值"，故置于数量范围校验之前 */
-    map = MB_Slave_FindMap(area, req.start_addr, req.quantity);
+    map = MB_Slave_FindMap(area, req.start_addr, qty);
     if (map == NULL) {
         mb_send_exception(Sour_Sock, Dest_Sock, req.trans_id, req.unit_id,
                           req.func, MB_EXC_ILLEGAL_ADDRESS);
         return 0;
     }
 
-    /* ⑥ 数量范围校验(非法数据值) */
-    exc = mb_check_quantity(req.func, req.quantity);
+    /* ⑦ 数量范围校验(非法数据值) —— 同样使用归一化值 */
+    exc = mb_check_quantity(req.func, qty);
     if (exc != MB_EXC_OK) {
         mb_send_exception(Sour_Sock, Dest_Sock, req.trans_id, req.unit_id, req.func, exc);
         return 0;
@@ -832,17 +846,18 @@ static int mb_process_adu(uint8_t Sour_Sock, uint8_t Dest_Sock,
         dev_index = (uint16_t)(map->dev_base + offset / map->words_per_dev);
     }
 
-    /* 计算实际需要访问的软元件点数与串口命令长度 */
+    /* 计算实际需要访问的软元件点数与串口命令长度
+     * (一律基于归一化 qty：单写功能码恒为 1 点，杜绝写入值 0xFF00 被当成 65280 点) */
     if (map->is_bit) {
-        dev_points = (uint16_t)(req.quantity * map->bits_per_reg);      /* 位点数 */
+        dev_points = (uint16_t)(qty * map->bits_per_reg);               /* 位点数 */
         /* 位命令按"字节数"下发，并补偿起始位的 8 位对齐偏移 */
         dev_count  = (uint16_t)(((dev_index % 8u) + dev_points + 7u) / 8u);
     } else {
-        dev_points = req.quantity;                                      /* 字数 */
-        dev_count  = (uint16_t)((req.quantity + map->words_per_dev - 1u) / map->words_per_dev);
+        dev_points = qty;                                               /* 字数 */
+        dev_count  = (uint16_t)((qty + map->words_per_dev - 1u) / map->words_per_dev);
     }
 
-    /* ⑦ 统一设置 MC 上下文：底层 MELSEC_FX_Build* 依赖这些字段查表与构造帧 */
+    /* ⑧ 统一设置 MC 上下文：底层 MELSEC_FX_Build* 依赖这些字段查表与构造帧 */
     net_mc_meta.Format_Code  = 0;                   /* 0 = 二进制 */
     net_mc_meta.pc_number    = 0xFF;
     net_mc_meta.device_name  = map->dev_code;
@@ -1046,7 +1061,8 @@ static int mb_process_adu(uint8_t Sour_Sock, uint8_t Dest_Sock,
     trans->stage      = stage;
     trans->trans_id   = req.trans_id;
     trans->start_addr = req.start_addr;
-    trans->quantity   = req.quantity;
+    trans->quantity   = req.quantity;   /* 读=数量；0x05/0x06=写入值(写响应须原样回显，
+                                         * 见 mb_send_write_echo，勿改为归一化值) */
     trans->dev_index  = dev_index;
     trans->dev_points = dev_points;
     trans->map        = map;

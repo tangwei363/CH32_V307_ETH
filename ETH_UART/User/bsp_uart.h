@@ -30,7 +30,7 @@
 #define  UART_USE_FIFO   1  // 1: 使用 队列管理 发送 0: 不使用 队列管理 发送
 
 /* Global define */
-#define BAUD_RATE   3000000
+#define BAUD_RATE   1000000
 
 #define size(a)   (sizeof(a) / sizeof(*(a)))
 

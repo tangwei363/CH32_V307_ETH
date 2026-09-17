@@ -778,8 +778,8 @@ int uartBaudRateSyncStateMachine(void)
     /* ─── 首次进入：定位到最高档，作为降档扫描的起点 ─── */
     if (ctx->state == BAUD_SYNC_STATE_INIT) {
         ctx->is_sync_flag = 0;
-        ctx->scan_index   = BAUDRATE_INDEX_MAX;                  /* 最高档索引(9) */
-        ctx->baudrate     = BaudrateTable[BAUDRATE_INDEX_MAX];   /* 3000000 bps */
+        ctx->scan_index   = 7;                  /* 最高档索引(9) */
+        ctx->baudrate     = BaudrateTable[7];   /* 3000000 bps */
         ctx->fail_count   = 0;
         ctx->apply_retry  = 0;
         ctx->scan_round   = 0;
