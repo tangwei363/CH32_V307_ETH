@@ -817,6 +817,11 @@ static int mb_process_adu(uint8_t Sour_Sock, uint8_t Dest_Sock,
      *    规范推荐"数据地址"判定先于"数据值"，故置于数量范围校验之前 */
     map = MB_Slave_FindMap(area, req.start_addr, qty);
     if (map == NULL) {
+        /* 0x02 成因①：地址区间 [addr, addr+qty-1] 不在映射表覆盖范围内
+         * (地址本身越界，或数量跨出了所在档位的末端)。
+         * 排查：核对 g_slave_addr_map[] 中该 area 的 mb_start/mb_end。 */
+        MB_DEBUG("MB 拒绝(0x02-地址不在映射表) func=%02X area=0x%02X addr=0x%04X qty=%u\r\n",
+                 req.func, area, req.start_addr, qty);
         mb_send_exception(Sour_Sock, Dest_Sock, req.trans_id, req.unit_id,
                           req.func, MB_EXC_ILLEGAL_ADDRESS);
         return 0;
@@ -839,6 +844,11 @@ static int mb_process_adu(uint8_t Sour_Sock, uint8_t Dest_Sock,
     } else {
         /* 32 位计数器要求请求起点落在软元件边界上 */
         if (map->words_per_dev > 1u && (offset % map->words_per_dev) != 0u) {
+            /* 0x02 成因②：32 位软元件(CN200~CN255)占 2 个寄存器，
+             * 请求起点落在"半个软元件"上 → 无法定位到完整软元件，属地址语义非法。
+             * 排查：起始地址必须为该软元件占位数的整数倍。 */
+            MB_DEBUG("MB 拒绝(0x02-32位软元件起点未对齐) func=%02X addr=0x%04X offset=%u words_per_dev=%u\r\n",
+                     req.func, req.start_addr, offset, map->words_per_dev);
             mb_send_exception(Sour_Sock, Dest_Sock, req.trans_id, req.unit_id,
                               req.func, MB_EXC_ILLEGAL_ADDRESS);
             return 0;
@@ -919,7 +929,10 @@ static int mb_process_adu(uint8_t Sour_Sock, uint8_t Dest_Sock,
          *     "起始 % 16 == 0"，此处收紧为 16 位判据以免落到 E10 的报错分支。 */
         case MB_FC_WRITE_MULTI_COILS: {
             uint8_t  bytes      = (uint8_t)((req.quantity + 7u) / 8u);
-            uint16_t bit_offset = (uint16_t)(dev_index % 8u);
+            /* 起始位在"16 位读回块"内的偏移。RMW 的读地址与回写地址都以 16 位对齐
+             * (见下方 net_mc_meta.start_device = dev_index & ~15u)，故必须按 16 取模；
+             * 用 %8 会让回写地址落在 8 而非 16 的倍数上，被 E10 直接拒绝。 */
+            uint16_t bit_offset = (uint16_t)(dev_index % 16u);
             uint16_t total_bits = (uint16_t)(bit_offset + req.quantity);
             uint16_t word_count = (uint16_t)((total_bits + 15u) / 16u);
 
@@ -966,10 +979,12 @@ static int mb_process_adu(uint8_t Sour_Sock, uint8_t Dest_Sock,
                                       req.func, MB_EXC_SLAVE_FAILURE);
                     return 0;
                 }
-                /* E00 读回当前状态；后续 MC_Net_BitBatchWrite_RMW_Merge 会以
-                 * (uart_mc_meta.start_device & ~7) 作为 E10 回写地址，
-                 * 故此处必须按 8 位对齐下发读命令，使上下文与合并地址一致。 */
-                net_mc_meta.start_device = (uint16_t)(dev_index & ~7u);
+                /* E00 读回当前状态。后续 MC_Net_BitBatchWrite_RMW_Merge 取
+                 * (uart_mc_meta.start_device & ~7) 作为 E10 回写地址 —— 对"本就是
+                 * 16 倍数"的地址，该掩码等效于不变，故这里直接按 16 位对齐下发，
+                 * 使 E10 的「字单位写位软元件要求 addr % 16 == 0」校验得以通过。
+                 * (原按 & ~7 对齐时，Y8/Y24 等会落在 8 的倍数但非 16 的倍数上 → 被拒) */
+                net_mc_meta.start_device = (uint16_t)(dev_index & ~15u);
                 net_mc_meta.device_count = word_count;
                 MELSEC_FX_BuildE00ReadCmd(Sour_Sock, Dest_Sock,
                                           net_mc_meta.start_device, word_count);
@@ -993,7 +1008,11 @@ static int mb_process_adu(uint8_t Sour_Sock, uint8_t Dest_Sock,
                 return 0;
             }
             if (map->is_bit && ((dev_index % 16u) != 0u)) {
-                /* 字区写位软元件必须 16 位对齐(整字写)；非对齐才需 RMW */
+                /* 0x02 成因③：字区中的位软元件(M/S/TS/CS/Y)用 E10 整字写，
+                 * 起始位必须落在 16 位整字边界上。
+                 * 排查：改用字区中 16 位对齐的地址，或改用位区(0x3300 段)寻址。 */
+                MB_DEBUG("MB 拒绝(0x02-字区位写入未16位对齐) func=%02X addr=0x%04X dev_index=%u\r\n",
+                         req.func, req.start_addr, dev_index);
                 mb_send_exception(Sour_Sock, Dest_Sock, req.trans_id, req.unit_id,
                                   req.func, MB_EXC_ILLEGAL_ADDRESS);
                 return 0;
@@ -1023,7 +1042,10 @@ static int mb_process_adu(uint8_t Sour_Sock, uint8_t Dest_Sock,
                 return 0;
             }
             if (map->is_bit && ((dev_index % 16u) != 0u)) {
-                /* 字区写位软元件必须 16 位对齐(整字写)；非对齐才需 RMW */
+                /* 0x02 成因④：同成因③，字区中的位软元件用 E10 整字批量写，
+                 * 起始位必须落在 16 位整字边界上。 */
+                MB_DEBUG("MB 拒绝(0x02-字区位写入未16位对齐) func=%02X addr=0x%04X dev_index=%u\r\n",
+                         req.func, req.start_addr, dev_index);
                 mb_send_exception(Sour_Sock, Dest_Sock, req.trans_id, req.unit_id,
                                   req.func, MB_EXC_ILLEGAL_ADDRESS);
                 return 0;
@@ -1206,10 +1228,25 @@ int MB_Slave_HandleSerialResp(uint8_t *buf, uint16_t len)
             return 0;
         }
         /* 复用 melsec_fx 已验证的合并逻辑：从 BitBatch 队列取出待写位，
-         * 与 E00 读回状态按位掩码合并后，内部自动下发 E10 写回命令。 */
-        (void)MC_Net_BitBatchWrite_RMW_Merge(&buf[1],
-                                             (uint8_t)(trans->dev_index & 7u),
-                                             trans->quantity);
+         * 与 E00 读回状态按位掩码合并后，内部自动下发 E10 写回命令。
+         *
+         * ★ 诊断陷阱（现场定位必读）：该函数内部对
+         *   MELSEC_FX_BuildE10WriteParamCmd 的返回值**未做传播**。若 E10 因
+         *   "起始位未 16 位对齐"等被本地拒绝，此处仍返回 0，本模块无法感知，
+         *   表现为"回写命令根本没发出去 → 本事务等不到 ACK → 300ms 后回 0x0B"。
+         *   此时唯一的现场特征就是串口层那条打印：
+         *     "以字单位指令写入位软元件 address=0xXXXX(N) 需要==16的倍数"
+         *   （另一种 0x02 成因④/③是网关侧预检，日志为"MB 拒绝(0x02-…)"，两者不同。） */
+        {
+            /* bit_offset 取 16 位模，与 0x0F 分支的 %16 及 16 位对齐读地址配套 */
+            int rmw_ret = MC_Net_BitBatchWrite_RMW_Merge(&buf[1],
+                                                         (uint8_t)(trans->dev_index & 15u),
+                                                         trans->quantity);
+            if (rmw_ret != 0) {
+                MB_DEBUG("MB 异常(读-改-写待写位队列为空) TID=%04X addr=0x%04X -> E10回写未下发\r\n",
+                         (unsigned int)trans->trans_id, (unsigned int)trans->start_addr);
+            }
+        }
         trans->stage = MB_STAGE_RMW_WRITE;
         /* 合并函数内部已下发 E10 写回命令 → 刷新本事务的串口序号，
          * 使第二阶段的 ACK 能通过序号配对校验 */

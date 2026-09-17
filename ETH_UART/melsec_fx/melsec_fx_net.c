@@ -386,7 +386,19 @@ int MC_Net_BitBatchWrite_RMW_Merge(const uint8_t *Resp_data,
     if (bit_offset != 0u) {
         uint8_t rb_hi = AsciiHexToUint8(Resp_data[0], Resp_data[1]); /* 设备偏移 0..7 */
         uint8_t hmask = (uint8_t)((1u << bit_offset) - 1u);          /* 保留低 bit_offset 个设备位 */
-        pend[0] = (uint16_t)(pend[0] | ((uint16_t)(rb_hi & hmask) << 8));
+        /* ASCII only: this file is GBK-encoded, keep additions ASCII-safe.
+         * hmask is uint8, so it only covers device offsets 0..7 (the high byte).
+         * For bit_offset in 9..15 the offsets 8..bit_offset-1 live in the LOW
+         * byte and must be preserved as well, otherwise those points get cleared.
+         * Widened to 16 bits here: high part keeps offsets 0..7, low part keeps
+         * offsets 8..bit_offset-1. For bit_offset <= 8 the low part is 0, so the
+         * behaviour of the existing (8-bit aligned) callers is unchanged. */
+        uint16_t hmask16 = (uint16_t)((1u << bit_offset) - 1u);
+        uint8_t  rb_lo_h = AsciiHexToUint8(Resp_data[2], Resp_data[3]);
+
+        pend[0] = (uint16_t)(pend[0]
+                             | ((uint16_t)((rb_hi & (uint8_t)hmask16) << 8))
+                             | (uint16_t)(rb_lo_h & (uint8_t)(hmask16 >> 8)));
         MELSEC_DEBUG("HEAD rb_hi=0x%02X hmask=0x%02X -> pend[0]=0x%04X\r\n", rb_hi, hmask, pend[0]);
     }
 
