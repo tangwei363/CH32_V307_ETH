@@ -330,6 +330,17 @@ void MB_Slave_NotifyFrameError(void);
 uint8_t MB_Slave_IsPending(uint8_t sock);
 
 /**
+ * @brief  查询某个 socket 是否已被确认为 Modbus 会话
+ * @param  sock  以太网 socket 编号
+ * @retval 1 = 是(该 socket 上收到过合法的 Modbus TCP 请求)；0 = 否
+ * @note   供 MC 协议层在"报警回送"(ethernet_error_code_ack) 前判断使用：
+ *         该 socket 是 Modbus 会话时必须抑制 MC 错误帧 —— Modbus 主站无法解析
+ *         MC 帧，否则会出现"一笔请求收到两条帧，且第一条格式非法"的现象。
+ *         失败改由本模块转成 Modbus 异常回送。
+ */
+uint8_t MB_Slave_IsModbusSock(uint8_t sock);
+
+/**
  * @brief  查询 Modbus 地址对应的映射条目(供外部诊断/调试使用)
  * @param  area  区域掩码(SLAVE_AREA_xxx)
  * @param  addr  Modbus 起始地址

@@ -426,12 +426,15 @@ int MC_Net_BitBatchWrite_RMW_Merge(const uint8_t *Resp_data,
     memcpy(&net_mc_meta, &uart_mc_meta, sizeof(uart_mc_meta));
     net_mc_meta.start_device = (uint32_t)(uart_mc_meta.start_device & ~7u);  /* 回写整字, 与 E00 读地址对齐 */
     net_mc_meta.device_count = (uint16_t)(word_count * 8);                    /* 实际点数(与原逻辑一致) */
-    MELSEC_FX_BuildE10WriteParamCmd(uart_rx_ctx.Sour_Sockid,
-                                    uart_rx_ctx.Dest_Sockid,
-                                    (uint16_t)(uart_mc_meta.start_device & ~7u),
-                                    (const uint16_t *)pend,
-                                    word_count);
-    return 0;
+    /* ASCII only (GBK-encoded file): propagate the builder result instead of
+     * swallowing it. Callers can then turn "E10 was rejected locally" into an
+     * immediate Modbus exception, instead of advancing the transaction and
+     * waiting for an ACK that will never arrive (300 ms fake timeout). */
+    return MELSEC_FX_BuildE10WriteParamCmd(uart_rx_ctx.Sour_Sockid,
+                                           uart_rx_ctx.Dest_Sockid,
+                                           (uint16_t)(uart_mc_meta.start_device & ~7u),
+                                           (const uint16_t *)pend,
+                                           word_count);
 }
 // ==================== MC协议数据结构定义 二进制码通信时的格式 ====================
 //1) 二进制码通信时

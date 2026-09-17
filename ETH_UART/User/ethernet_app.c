@@ -255,6 +255,21 @@ void ethernet_error_code_ack (uint8_t Sour_Sock,uint8_t Dest_Sock,uint8_t sub_he
     uint8_t  txbuf[4] = {0};                       // ASCII 模式最多 4 字节(每字节 2 字符)
     uint16_t lend  = 0;
 
+    /* [A] Modbus session guard: a Modbus master cannot parse an MC error frame,
+     * and sending it made a single request yield two replies (the first one
+     * malformed) on the wire. mb_slave now reports such failures as a proper
+     * Modbus exception, so only the MC frame itself is suppressed here; the
+     * Error_Code upload to the PLC below is kept intact.
+     * NOTE: ASCII only -- this file is GBK-encoded. */
+    if (MB_Slave_IsModbusSock(Sour_Sock) != 0u) {
+        MB_DEBUG("[SUPPRESS-MC-ERR] sock=%u Modbus session, MC err frame (sub=0x%02X code=0x%02X) not sent\r\n",
+                 Sour_Sock, sub, code);
+        if (socket_p->Error_Code) {
+            wizchip_updata_socket_to_PLC(Sour_Sock, 1 );
+        }
+        return;
+    }
+
     // 重新打包成MC协议格式的数据
     if( uart_mc_meta.Format_Code == 0x00 ){ // 0 : 二进制 格式 
         // 打包二进制格式数据

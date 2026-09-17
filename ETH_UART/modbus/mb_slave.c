@@ -417,6 +417,59 @@ static uint16_t mb_serialize_adu(uint16_t trans_id, uint8_t unit_id,
 }
 
 /**
+ * @brief  响应自检：打印即将回送的 Modbus 响应的类别 / TID / 功能码 / PDU
+ * @param  trans_id  事务标识符(原样回送主站的 TID)
+ * @param  unit_id   单元标识符
+ * @param  pdu       响应 PDU 首指针
+ * @param  pdu_len   PDU 长度
+ * @retval 无
+ * @note   现场排查"响应与请求错配 / 上一笔的响应被主站当成这一笔"时，本行是
+ *         网关侧的**权威记录**：本模块回送的 TID 恒等于请求的 TID，故把本行与
+ *         主站 RX 日志按时间对齐，即可确认"哪个 TID、哪个功能码、哪类响应被发出"。
+ *
+ *         类别由功能码推导，无需额外传参：
+ *           最高位为 1          → EXC        异常响应(功能码+异常码)
+ *           0x05/0x06/0x0F/0x10 → WRITE-ECHO 写响应(回显 功能码+地址+值或数量)
+ *           其余                → READ-DATA  读响应(含字节数与数据)
+ *
+ *         典型误判场景：主站把一条 WRITE-ECHO 当成上一笔读请求的响应 ——
+ *         此时本行会显示 func=0F 且类别为 WRITE-ECHO，与主站期望的 0x01(READ-DATA)
+ *         一眼可辨，无需再逐字段反推 PDU 结构。
+ */
+static void mb_trace_response(uint16_t trans_id, uint8_t unit_id,
+                              const uint8_t *pdu, uint16_t pdu_len)
+{
+    char        hex[25];                /* 最多打印 8 字节: 8×3 字符 + 结束符 */
+    const char *kind;
+    uint16_t    n;
+    uint16_t    show;
+    uint8_t     func;
+
+    if (pdu == NULL || pdu_len == 0u) {
+        return;
+    }
+
+    func = pdu[0];
+    if ((func & 0x80u) != 0u) {
+        kind = "EXC";
+    } else if (func == MB_FC_WRITE_SINGLE_COIL || func == MB_FC_WRITE_SINGLE_REG ||
+               func == MB_FC_WRITE_MULTI_COILS || func == MB_FC_WRITE_MULTI_REGS) {
+        kind = "WRITE-ECHO";
+    } else {
+        kind = "READ-DATA";
+    }
+
+    show = (pdu_len > 8u) ? 8u : pdu_len;
+    for (n = 0u; n < show; n++) {
+        (void)sprintf(&hex[n * 3u], "%02X ", pdu[n]);
+    }
+
+    MB_DEBUG("MB 响应自检[%s] TID=%04X unit=%02X func=%02X pdu_len=%u pdu=%s%s\r\n",
+             kind, (unsigned int)trans_id, unit_id, func, pdu_len, hex,
+             (show < pdu_len) ? "..." : "");
+}
+
+/**
  * @brief  向指定 socket 回送一帧 Modbus TCP 响应
  * @param  sock       目标以太网 socket
  * @param  dest_sock  串口链路的目的 socket(与请求一致)
@@ -441,6 +494,9 @@ static int mb_send_response(uint8_t sock, uint8_t dest_sock,
     if (adu_len == 0) {
         return -1;
     }
+
+    /* 响应自检：异常响应与写回显都经由本函数回送 */
+    mb_trace_response(trans_id, unit_id, pdu, pdu_len);
 
     /* 复用工程既有的以太网发送接口(destip/destport 取自连接表) */
     ethernet_send(sock, dest_sock, adu, adu_len,
@@ -476,6 +532,9 @@ static int mb_send_pdu_inplace(uint8_t sock, uint8_t dest_sock,
     adu[4] = (uint8_t)((pdu_len + 1u) >> 8);        /* 长度 = 单元标识 + PDU */
     adu[5] = (uint8_t)((pdu_len + 1u) & 0xFFu);
     adu[6] = unit_id;                               /* 单元标识符        */
+
+    /* 响应自检：读数据响应(PDU 位于 adu[7..]) */
+    mb_trace_response(trans_id, unit_id, &adu[7], pdu_len);
 
     ethernet_send(sock, dest_sock, adu, total,
                   eth_socket[sock].destip, eth_socket[sock].destport);
@@ -677,6 +736,17 @@ void MB_Slave_Init(void)
 uint8_t MB_Slave_IsPending(uint8_t sock)
 {
     return (uint8_t)(g_mb_slave.trans.busy && g_mb_slave.trans.sock == sock);
+}
+
+/**
+ * @brief  查询某个 socket 是否已被确认为 Modbus 会话
+ * @param  sock  以太网 socket 编号
+ * @retval 1 = 是；0 = 否
+ * @note   直接复用内部会话位图，供 MC 协议层抑制"越权回包"。
+ */
+uint8_t MB_Slave_IsModbusSock(uint8_t sock)
+{
+    return mb_sock_is_modbus(sock);
 }
 
 /**
@@ -963,9 +1033,22 @@ static int mb_process_adu(uint8_t Sour_Sock, uint8_t Dest_Sock,
 
             if (((dev_index % 16u) == 0u) &&
                 ((uint16_t)((dev_index + total_bits) % 16u) == 0u)) {
-                /* 分支2：整字对齐 → E10 直接批量写入 */
-                MELSEC_FX_BuildE10WriteParamCmd(Sour_Sock, Dest_Sock, dev_index,
-                                                g_mb_slave.scratch, word_count);
+                /* 分支2：整字对齐 → E10 直接批量写入
+                 * 必须检查返回码：命令未下发时若继续等待 ACK 会白等超时并锁死在途模型 */
+                int e10_ret = MELSEC_FX_BuildE10WriteParamCmd(Sour_Sock, Dest_Sock, dev_index,
+                                                              g_mb_slave.scratch, word_count);
+
+                if (e10_ret != MELSEC_FX_SUCCESS) {
+                    MB_DEBUG("MB 异常(整字批量写未下发, code=%d) TID=%04X addr=0x%04X -> 立即回 %s\r\n",
+                             e10_ret, (unsigned int)req.trans_id,
+                             (unsigned int)req.start_addr,
+                             (e10_ret == MELSEC_FX_ERR_ADDR_RANGE) ? "0x02" : "0x04");
+                    mb_send_exception(Sour_Sock, Dest_Sock, req.trans_id, req.unit_id,
+                                      req.func,
+                                      (e10_ret == MELSEC_FX_ERR_ADDR_RANGE)
+                                          ? MB_EXC_ILLEGAL_ADDRESS : MB_EXC_SLAVE_FAILURE);
+                    return 0;
+                }
             } else {
                 /* 分支3：非对齐 → 读-改-写(两阶段事务) */
                 if (word_count > BITBATCH_NODE_DATA_LEN) {
@@ -1203,9 +1286,11 @@ int MB_Slave_HandleSerialResp(uint8_t *buf, uint16_t len)
     Sour_Sock = trans->sock;
     Dest_Sock = mb_pick_dest_sock(trans);
 
-    MB_DEBUG("MB 串口响应 TID=%04X func=%02X stage=%u uart_seq=%u len=%u\r\n",
-             (unsigned int)trans->trans_id, trans->func, trans->stage,
-             (unsigned int)trans->uart_seq, len);
+    /* 入口自检：补齐 req_func / is_write，明确"接下来会回哪一类响应"
+     * (与后面每笔实际回送的"MB 响应自检[...]"配对阅读) */
+    MB_DEBUG("MB 串口响应 TID=%04X req_func=%02X is_write=%u stage=%u uart_seq=%u len=%u\r\n",
+             (unsigned int)trans->trans_id, trans->func, (unsigned int)trans->is_write,
+             trans->stage, (unsigned int)trans->uart_seq, len);
 
 #if (MB_SLAVE_DROP_SUPERSEDED == 1)
     /* 本事务已被主站的新请求取代 → 若按原 TID 回送，主站会把这条迟到帧
@@ -1242,9 +1327,27 @@ int MB_Slave_HandleSerialResp(uint8_t *buf, uint16_t len)
             int rmw_ret = MC_Net_BitBatchWrite_RMW_Merge(&buf[1],
                                                          (uint8_t)(trans->dev_index & 15u),
                                                          trans->quantity);
-            if (rmw_ret != 0) {
-                MB_DEBUG("MB 异常(读-改-写待写位队列为空) TID=%04X addr=0x%04X -> E10回写未下发\r\n",
-                         (unsigned int)trans->trans_id, (unsigned int)trans->start_addr);
+            if (rmw_ret != MELSEC_FX_SUCCESS) {
+                /* E10 回写命令**未能下发**(被 E10 拒绝 / 待写位队列为空)：
+                 * 绝不能推进到 RMW_WRITE 阶段去等一个永远不会来的 ACK —— 否则会白等
+                 * MB_SLAVE_TIMEOUT_MS 再回 0x0B，期间还锁死单笔在途模型，把后续请求
+                 * 全部堵成 0x06。此处立即丢弃本请求已入队的待写位，回一条 Modbus
+                 * 异常并结束事务。 */
+                uint16_t discard_words = 0u;
+
+                (void)BitBatch_queue_Dequeue(g_mb_slave.scratch, &discard_words);
+
+                MB_DEBUG("MB 异常(读-改-写回写未下发, code=%d) TID=%04X addr=0x%04X -> 立即回 %s\r\n",
+                         rmw_ret, (unsigned int)trans->trans_id,
+                         (unsigned int)trans->start_addr,
+                         (rmw_ret == MELSEC_FX_ERR_ADDR_RANGE) ? "0x02" : "0x04");
+
+                mb_send_exception(Sour_Sock, Dest_Sock, trans->trans_id, trans->unit_id,
+                                  trans->func,
+                                  (rmw_ret == MELSEC_FX_ERR_ADDR_RANGE)
+                                      ? MB_EXC_ILLEGAL_ADDRESS : MB_EXC_SLAVE_FAILURE);
+                mb_trans_end(trans);
+                return 0;
             }
         }
         trans->stage = MB_STAGE_RMW_WRITE;
