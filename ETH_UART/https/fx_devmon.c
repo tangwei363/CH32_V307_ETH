@@ -435,31 +435,33 @@ void FX_DEVMON_UpdateMonitor_Data_REAL_form(u8 device_type, u8 *buff, u16 len)
     u8 device_number = g_monitor_config.device_number;
     u16 buff_index = 0;
     DEVMON_DEBUG("g_data_rows REAL_form \r\n" );
-    /* 更新实数格式数据 */
-    for (int i = 0; i < FX_DEVMON_MAX_ROWS && buff_index + 3 < len; i++)
+    /* ★ 更新实数格式数据：与 32 位整数同样按"一个值占两个表行"排布 */
+    for (int i = 0; (i + 1) < FX_DEVMON_MAX_ROWS && buff_index + 3 < len; i += 2)
     {
         // 存储32位实数
         union {
             float f;
             uint32_t u;
         } real_value;
-        
-        real_value.u = (buff[buff_index+3] << 24) | (buff[buff_index+2] << 16) | 
-                      (buff[buff_index+1] << 8) | buff[buff_index];
-        DEVMON_DEBUG("%f\r\n",real_value.f );
-        // 将实数转换为整数存储（实际应用中可能需要调整）
+        uint16_t lo_word = (uint16_t)(buff[buff_index] | (buff[buff_index + 1] << 8));
+        uint16_t hi_word = (uint16_t)(buff[buff_index + 2] | (buff[buff_index + 3] << 8));
+
         /* 保存浮点的"原始位模式"而不是截断后的整数（原写法把 3.14 显示成 3）。
          * 页面按 float 解释该 32 位值；字序约定见文件开头说明。 */
+        real_value.u = ((uint32_t)hi_word << 16) | (uint32_t)lo_word;
+        DEVMON_DEBUG("%f\r\n", real_value.f);
+
+        // 低字行：保存实数位模式；高字行：只用于显示该字的 16 个位
         g_data_rows[i].word_value = real_value.u;
-        buff_index += 4;
-        
-        // 设置软元件编号
         g_data_rows[i].device_number = device_number + i;
-        
-        // 计算位值
+        g_data_rows[i + 1].word_value = hi_word;
+        g_data_rows[i + 1].device_number = device_number + i + 1;
+
+        buff_index += 4;
+
         for (uint8_t bit_index = 0; bit_index < 16; bit_index++) {
             g_data_rows[i].bit_values[bit_index] = (g_data_rows[i].word_value >> bit_index) & 0x01;
-            DEVMON_DEBUG(" %X -", g_data_rows[i].bit_values[bit_index] );
+            g_data_rows[i + 1].bit_values[bit_index] = (g_data_rows[i + 1].word_value >> bit_index) & 0x01;
         }
     }
 }
@@ -481,22 +483,29 @@ void FX_DEVMON_UpdateMonitor_Data_32BIT_form(u8 device_type, u8 *buff, u16 len)
     u16 buff_index = 0;
     
     DEVMON_DEBUG("g_data_rows 32BIT_form \r\n" );
-    /* 更新32位整数格式数据 */
-    for (int i = 0; i < FX_DEVMON_MAX_ROWS && buff_index + 3 < len; i++)
+    /* ★ 更新32位整数格式数据：一个值占两个表行
+     *   第 i   行 = 低字(bit0~15)：值列显示 32 位整数
+     *   第 i+1 行 = 高字(bit16~31)：值列显示 "..."（占位行）
+     * 这样值的地址 = 本行与下一行的两个字，与页面行号一一对应；
+     * 取回的 8 个字也正好填满 8 个表行，不会再出现"后半页无数据"。 */
+    for (int i = 0; (i + 1) < FX_DEVMON_MAX_ROWS && buff_index + 3 < len; i += 2)
     {
-        // 存储32位整数
-        g_data_rows[i].word_value = (buff[buff_index+3] << 24) | (buff[buff_index+2] << 16) | 
-                                   (buff[buff_index+1] << 8) | buff[buff_index];
-        buff_index += 4;
-        DEVMON_DEBUG("%X\r\n",g_data_rows[i].word_value );
-        // 设置软元件编号
-        g_data_rows[i].device_number = device_number + i;
+        uint16_t lo_word = (uint16_t)(buff[buff_index] | (buff[buff_index + 1] << 8));
+        uint16_t hi_word = (uint16_t)(buff[buff_index + 2] | (buff[buff_index + 3] << 8));
 
-        DEVMON_DEBUG("bit_[%d]:",i  );
-        // 计算位值
+        // 低字行：保存 32 位值（低位字在前，字序约定见文件开头说明）
+        g_data_rows[i].word_value = ((uint32_t)hi_word << 16) | (uint32_t)lo_word;
+        g_data_rows[i].device_number = device_number + i;
+        // 高字行：只用于显示该字的 16 个位；值列由格式化函数输出 "..."
+        g_data_rows[i + 1].word_value = hi_word;
+        g_data_rows[i + 1].device_number = device_number + i + 1;
+
+        buff_index += 4;
+        DEVMON_DEBUG("%X\r\n", g_data_rows[i].word_value);
+
         for (uint8_t bit_index = 0; bit_index < 16; bit_index++) {
             g_data_rows[i].bit_values[bit_index] = (g_data_rows[i].word_value >> bit_index) & 0x01;
-            DEVMON_DEBUG(" %X -", g_data_rows[i].bit_values[bit_index] );
+            g_data_rows[i + 1].bit_values[bit_index] = (g_data_rows[i + 1].word_value >> bit_index) & 0x01;
         }
     }
 }
@@ -591,11 +600,24 @@ static uint8_t FX_DEVMON_GetDataKind(void)
     return FX_DEVMON_KIND_NONE;
 }
 
+/* ★ 一个"值"占几个表行：
+ *   16 位整数 / ASCII -> 1 行（一行一个值）
+ *   32 位整数 / 实数  -> 2 行（低字行显示数值 + 高字行值列显示 "..."）
+ * 表格行恒等于"一个字"(2 字节)，所以 32 位显示时 8 个表行正好容纳 4 个值 = 8 个字。 */
+static uint8_t FX_DEVMON_RowsPerValue(uint8_t display)
+{
+    if (display == FX_DEVMON_DISP_32BIT || display == FX_DEVMON_DISP_REAL) {
+        return 2;
+    }
+    return 1;
+}
+
 /* 一行数据占用几个字节（与各解析函数内部一致） */
 static uint8_t FX_DEVMON_BytesPerRow(uint8_t display)
 {
     if (display == FX_DEVMON_DISP_32BIT || display == FX_DEVMON_DISP_REAL) {
-        return 4;                                   /* 32 位：两个字 */
+        /* 32 位/实数：每个表行仍只占 1 个字，一个值跨两行（见 FX_DEVMON_RowsPerValue） */
+        return 2;
     }
     if (display == FX_DEVMON_DISP_16BIT &&
         g_monitor_config.monitor_type == FX_DEVMON_MONITOR_DEVICE &&
@@ -687,6 +709,15 @@ static void FX_DEVMON_FormatValueCell(uint16_t row, char *out, uint8_t out_size)
         return;
     }
 
+    /* ★ 32 位/实数：一个值占两行 —— 奇数行是"高字占位行"，值列显示 "..." */
+    if (FX_DEVMON_RowsPerValue((uint8_t)g_monitor_config.display) > 1u && (row & 1u) != 0u) {
+        out[0] = '.';
+        out[1] = '.';
+        out[2] = '.';
+        out[3] = 0;
+        return;
+    }
+
     v = g_data_rows[row].word_value;
 
     /* 位类型：值只有 0 / 1（体现"位型"与"字型"的显示差异） */
@@ -735,10 +766,16 @@ static void FX_DEVMON_FormatValueCell(uint16_t row, char *out, uint8_t out_size)
 /* 值列的样式类：位类型的"1"沿用现有 bit1 样式，其余不加样式 */
 static const char *FX_DEVMON_ValueCellClass(uint16_t row)
 {
+    /* 32 位/实数的"高字占位行"：值列是 "..."，用灰字样式 */
+    if (FX_DEVMON_RowsPerValue((uint8_t)g_monitor_config.display) > 1u && (row & 1u) != 0u) {
+        return "ell";
+    }
+    /* 位类型且值为 1：高亮。注意这里用 v1 而不是 bit1 —— bit1 现在带有
+     * "正方形位单元"的宽高，用在"值"列会把值列也压成方块。 */
     if (FX_DEVMON_GetDataKind() == FX_DEVMON_KIND_BIT &&
         FX_DEVMON_RowIsValid(row) &&
         g_data_rows[row].bit_values[0] != 0u) {
-        return "bit1";
+        return "v1";
     }
     return "";
 }
@@ -809,6 +846,7 @@ void FX_DEVMON_UpdateMonitor_Data(u8 *buff, u16 len)
     uint8_t  kind;
     uint8_t  display;
     uint8_t  bytes_per_row;
+    uint8_t  rpv;
     uint16_t rows_ok;
     uint16_t valid_rows;
     uint16_t i;
@@ -860,6 +898,12 @@ void FX_DEVMON_UpdateMonitor_Data(u8 *buff, u16 len)
     rows_ok = (uint16_t)(len / bytes_per_row);
     if (rows_ok > (uint16_t)FX_DEVMON_MAX_ROWS) {
         rows_ok = (uint16_t)FX_DEVMON_MAX_ROWS;
+    }
+    /* 32 位/实数：一个值跨两个表行（低字行 + 高字行），有效行数必须是 2 的整数倍
+     * ——回帧里缺一个字的"半个值"不算有效，避免低字行显示新值、高字行留着旧数据。 */
+    rpv = FX_DEVMON_RowsPerValue(display);
+    if (rpv > 1u) {
+        rows_ok = (uint16_t)((rows_ok / rpv) * rpv);
     }
 
     DEVMON_DEBUG("监视格式=%d 显示=%d 进制数=%d 位顺序=%d kind=%d len=%d 每行=%d字节\r\n",
@@ -1211,7 +1255,8 @@ static void FX_DEVMON_SendDataRows(uint8_t Dest_Sock, int start_row, int end_row
         /* 空行列数必须与数据行列数完全一致（共用 FX_DEVMON_BitColumnCount()），
          * 否则空行比数据行窄/宽，表格会错位。 */
         for (j = 0; j < (int)FX_DEVMON_BitColumnCount(); j++) {
-            offset += HTML_PACK(temp_buffer, offset, "<td>&nbsp;</td>\r\n");
+            /* 空位单元也用 c0：与数据行的方形位单元同尺寸，行高才不会塌下去 */
+            offset += HTML_PACK(temp_buffer, offset, "<td class=\"c0\">&nbsp;</td>\r\n");
         }
         
         /* 空行的"值"列：与数据行一样只占 1 个单元格（原实现多出一格，空行比数据行宽 1 列）。 */
@@ -1263,9 +1308,11 @@ static void FX_DEVMON_SendData_Table(uint8_t Dest_Sock)
         //位顺序
         if( g_monitor_config.bit_order == FX_DEVMON_BIT_ORDER_0F)  /* 0-F */
         {
-            offset += HTML_PACK(buffer, offset, "<td width=\"40\">%X</td>", i);
+            /* 表头位单元：宽高一致(正方形)，列宽由本行决定(table-layout:fixed)，
+             * 数据行再用 c0/bit1 的 height 保持一致 */
+            offset += HTML_PACK(buffer, offset, "<td width=\"28\" height=\"28\">%X</td>", i);
         }else{ /* F-0 */
-            offset += HTML_PACK(buffer, offset, "<td width=\"40\">%X</td>", (num - 1 - i) );
+            offset += HTML_PACK(buffer, offset, "<td width=\"28\" height=\"28\">%X</td>", (num - 1 - i) );
         }
     }
     // 值列标题
