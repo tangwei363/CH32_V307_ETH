@@ -21,6 +21,16 @@ static fx_devmon_config_t g_monitor_config;
 static fx_devmon_row_t g_data_rows[FX_DEVMON_MAX_ROWS];
 static uint8_t g_row_count = 0;
 
+/* 本次解析的状态位（页面据此给出明确提示） */
+#define FX_DEVMON_NOTICE_EMPTY    0x01u /* 回帧为空 / 长度为 0 */
+#define FX_DEVMON_NOTICE_TYPE     0x02u /* 显示格式与数据类别不匹配（已按 16 位整数显示） */
+#define FX_DEVMON_NOTICE_UNKNOWN  0x04u /* 未知的显示格式（已按 16 位整数显示） */
+#define FX_DEVMON_NOTICE_SHORT    0x08u /* 回帧长度不足（未覆盖的行显示 "--"） */
+#define FX_DEVMON_NOTICE_BADDEV   0x10u /* 软元件类型/起始编号非法（暂无可监视数据） */
+
+static uint8_t g_devmon_notice = 0;
+
+
 /* ── 监视数据的字节/字序约定（与 PLC 侧一致，改动前请先看第 4 条的实测方法）──
  * 1) UART 回帧的数据段是 ASCII 十六进制文本，由 HTTPS.c 的 Web_Usart_Handler
  *    先调 hex_str_to_intlend() 解码为二进制（ASCII "12AB" → 字节 0x12,0xAB，
@@ -40,6 +50,7 @@ static uint8_t g_row_count = 0;
  * 静态函数声明
  *********************************************************************/
 static char* FX_DEVMON_GetDeviceTypeString(fx_devmon_device_type_t dev_type);
+static void    FX_DEVMON_NormalizeConfig(void);   /* 配置归一化：UpdateMonitor_CMD/SendWebPage 都在其定义之前调用 */
  
 /*********************************************************************
  * @fn      FX_DEVMON_Init
@@ -238,6 +249,11 @@ int FX_DEVMON_SetBufferWord(uint8_t Sour_Sock, uint8_t Dest_Sock, uint16_t g_add
 void FX_DEVMON_UpdateMonitor_CMD(uint8_t Sour_Sock ,uint8_t  Dest_Sock )
 {
  
+    /* ★ 取数前归一化配置：本函数的行数与请求点数计算依赖 form / display，未归一化会出现
+     *   "字软元件按位取数""位点按 32 位取数"这类长度错配（回帧长度与解析方式不一致）。 */
+    FX_DEVMON_NormalizeConfig();
+    g_devmon_notice &= (uint8_t)~FX_DEVMON_NOTICE_BADDEV;   /* re-evaluate device validity */
+
     //发送数据指令到PLC 通过网页选择的软元件/缓冲存储器起始地址和结束地址发送数据
     if( g_monitor_config.monitor_type == FX_DEVMON_MONITOR_BUFFER)  /* 监视类型 */
     {
@@ -314,6 +330,7 @@ void FX_DEVMON_UpdateMonitor_CMD(uint8_t Sour_Sock ,uint8_t  Dest_Sock )
                 DEVMON_DEBUG("软元件类型/起始编号非法: code=0x%04X num=%d\r\n",
                              net_mc_meta.device_name, device_number);
                 rows = 0;
+                g_devmon_notice |= FX_DEVMON_NOTICE_BADDEV;   /* page shows an explicit notice */
             } else if (((uint32_t)device_number + (uint32_t)FX_DEVMON_MAX_ROWS - 1u) <= (uint32_t)dev_end) {
                 rows = FX_DEVMON_MAX_ROWS;
             } else {
@@ -534,93 +551,363 @@ void FX_DEVMON_UpdateMonitor_Data_16BIT_form(u8 device_type, u8 *buff, u16 len)
     }
 }
 
-/*********************************************************************
- * @fn      FX_DEVMON_UpdateMonitor_Data
+/* ══════════════════════════════════════════════════════════════════
+ * ★ 串口回应数据的"类型判定 + 类型化解析显示"（本次增强）
  *
- * @brief   更新监控数据主函数
+ * 一、数据类别 kind 由"监视类型 + 软元件类型"唯一决定，与显示格式无关：
+ *     缓冲存储器 / D R T C     -> 字类型 FX_DEVMON_KIND_WORD
+ *     X Y M S（含 TS/CS 触点） -> 位类型 FX_DEVMON_KIND_BIT
+ *     其它取值                 -> 非法   FX_DEVMON_KIND_NONE
  *
- * @param   buff - 数据缓冲区
- * @param   len - 数据长度
+ * 二、"数据类别"与"显示格式"的匹配关系（不匹配 -> 默认转换为 16 位整数 + 页面明确提示）：
+ *     字类型：16 位整数 / 32 位整数 / 实数 / ASCII 字符 均合法
+ *     位类型：仅 16 位整数合法（位点没有 32 位整数、实数、ASCII 的概念）
  *
- * @return  none
- */
-void FX_DEVMON_UpdateMonitor_Data(u8 *buff, u16 len)
+ * 三、每行占用的字节数（回帧长度校验用，与各 *_form 解析函数一致）：
+ *     16 位整数 / ASCII -> 2 字节；32 位整数 / 实数 -> 4 字节
+ *     C200~C234（32 位计数器）在 16 位整数格式下同样按 4 字节消费
+ *
+ * 四、边界处理：回帧长度不足的行标为无效(is_valid=0)、值列显示 "--"，
+ *     不再显示上一轮的残留值；空回帧、非法软元件也各有明确提示。
+ * ══════════════════════════════════════════════════════════════════ */
+
+#define FX_DEVMON_KIND_NONE   0u        /* 非法 / 未知 */
+#define FX_DEVMON_KIND_WORD   1u        /* 字类型 */
+#define FX_DEVMON_KIND_BIT    2u        /* 位类型 */
+
+
+/* 判定"数据类别"—— 类型判定的唯一入口 */
+static uint8_t FX_DEVMON_GetDataKind(void)
 {
-    /* 检查缓冲区是否为空 */
-    if (buff == NULL || len == 0) {
-        DEVMON_DEBUG("数据缓冲区为空\r\n");
+    if (g_monitor_config.monitor_type == FX_DEVMON_MONITOR_BUFFER) {
+        return FX_DEVMON_KIND_WORD;                 /* 缓冲存储器：按字处理 */
+    }
+    if (FX_DEVMON_IsWordDevice((uint8_t)g_monitor_config.device_type)) {
+        return FX_DEVMON_KIND_WORD;                 /* D / R / T / C */
+    }
+    if ((uint8_t)g_monitor_config.device_type <= (uint8_t)FX_DEVMON_DEV_CS) {
+        return FX_DEVMON_KIND_BIT;                  /* X / Y / M / S / TS / CS */
+    }
+    return FX_DEVMON_KIND_NONE;
+}
+
+/* 一行数据占用几个字节（与各解析函数内部一致） */
+static uint8_t FX_DEVMON_BytesPerRow(uint8_t display)
+{
+    if (display == FX_DEVMON_DISP_32BIT || display == FX_DEVMON_DISP_REAL) {
+        return 4;                                   /* 32 位：两个字 */
+    }
+    if (display == FX_DEVMON_DISP_16BIT &&
+        g_monitor_config.monitor_type == FX_DEVMON_MONITOR_DEVICE &&
+        g_monitor_config.device_type == FX_DEVMON_DEV_C &&
+        g_monitor_config.device_number >= 200u) {
+        return 4;                                   /* C200~C234：32 位计数器 */
+    }
+    return 2;                                       /* 16 位整数 / ASCII：一个字 */
+}
+
+/* 该显示格式是否与数据类别匹配（类型不匹配的判定） */
+static uint8_t FX_DEVMON_IsDisplayValid(uint8_t kind, uint8_t display)
+{
+    if (display > (uint8_t)FX_DEVMON_DISP_ASCII) {
+        return 0;                                   /* 未知格式 */
+    }
+    if (kind == FX_DEVMON_KIND_BIT) {
+        return (display == (uint8_t)FX_DEVMON_DISP_16BIT) ? 1u : 0u;
+    }
+    if (kind == FX_DEVMON_KIND_WORD) {
+        return 1u;
+    }
+    return (display == (uint8_t)FX_DEVMON_DISP_16BIT) ? 1u : 0u;
+}
+
+/* 该行数据是否有效（本轮回帧是否覆盖到该行） */
+static uint8_t FX_DEVMON_RowIsValid(uint16_t row)
+{
+    if (row >= (uint16_t)FX_DEVMON_MAX_ROWS) {
+        return 0;
+    }
+    return g_data_rows[row].is_valid ? 1u : 0u;
+}
+
+/* 实数(32 位浮点)的定点显示：±整数.三位小数
+ * 不使用 printf 的 %f（会拉入完整浮点 printf），只做最基本的浮点运算。 */
+static void FX_DEVMON_FormatReal(uint32_t bits, char *out)
+{
+    union { float f; uint32_t u; } rv;
+    int32_t  ip;
+    uint32_t frac;
+    const char *sign = "";
+
+    rv.u = bits;
+    if (rv.f != rv.f) {                             /* NaN */
+        out[0] = 'N'; out[1] = 'a'; out[2] = 'N'; out[3] = 0;
         return;
     }
-    
-    // 发送数据指令到PLC 通过网页选择的软元件/缓冲存储器起始地址和结束地址发送数据
-    if (g_monitor_config.monitor_type == FX_DEVMON_MONITOR_BUFFER)  /* 监视类型 */
-    {
-        /* 缓冲存储器 */
-        DEVMON_DEBUG("监听 缓冲存储器:模块号=%d ", g_monitor_config.buffer_module);
-        if (g_monitor_config.buffer_hex) {
-            DEVMON_DEBUG("起始地址= %d \r\n", g_monitor_config.buffer_address);
-        } else {
-            DEVMON_DEBUG("起始地址= 0x%04X \r\n", g_monitor_config.buffer_address);
-        }
-        
-        // 缓冲存储器数据处理（这里可以根据实际需求实现）
-        u16 buff_index = 0;
-        for (int i = 0; i < FX_DEVMON_MAX_ROWS && buff_index + 1 < len; i++) {
-            g_data_rows[i].word_value = (buff[buff_index+1] << 8) | buff[buff_index];
-            g_data_rows[i].device_number = g_monitor_config.buffer_address + i;
-            buff_index += 2;
-            
-            // 计算位值
-            for (uint8_t bit_index = 0; bit_index < 16; bit_index++) {
-                g_data_rows[i].bit_values[bit_index] = (g_data_rows[i].word_value >> bit_index) & 0x01;
-            }
-        }
+    if (rv.f < 0.0f) {
+        sign = "-";
+        rv.f = -rv.f;
     }
-    else  
-    {
-        uint8_t device_type = g_monitor_config.device_type;               // 软元件类型
+    if (rv.f > 2000000000.0f) {                     /* 超出定点表示范围 */
+        out[0] = 'O'; out[1] = 'V'; out[2] = 'F'; out[3] = 0;
+        return;
+    }
+    ip   = (int32_t)rv.f;
+    frac = (uint32_t)((rv.f - (float)ip) * 1000.0f + 0.5f);
+    if (frac >= 1000u) {
+        frac = 0u;
+        ip  += 1;
+    }
+    sprintf(out, "%s%d.%03u", sign, (int)ip, (unsigned)frac);
+}
 
-        DEVMON_DEBUG("监视格式= %d 显示=%d 进制数=%d,位顺序=%d \r\n",
-                                    g_monitor_config.form,
-                                    g_monitor_config.display,
-                                    g_monitor_config.value_format,
-                                    g_monitor_config.bit_order);
+/* ★ 值列的"类型化"格式化：数据行值列的唯一出口
+ *   行无效       -> "--"            （本轮回帧未覆盖，明确表示"无数据"）
+ *   位类型       -> "0" / "1"       （位点不按整数/32 位显示）
+ *   ASCII 字符   -> 两个可打印字符  （不可打印显示 '.'；原实现把 ASCII 当数字显示）
+ *   实数(32位)   -> ±整数.三位小数  （原实现显示的是 IEEE754 位模式整数）
+ *   32 位整数    -> 16 进制 %08X / 10 进制
+ *   16 位整数    -> 16 进制 %04X / 10 进制
+ * out 缓冲由调用方保证不小于 12 字节。 */
+static void FX_DEVMON_FormatValueCell(uint16_t row, char *out, uint8_t out_size)
+{
+    uint32_t v;
+    char     hi;
+    char     lo;
 
-        // 根据显示格式调用相应的处理函数
-        switch (g_monitor_config.display) {
-            case FX_DEVMON_DISP_16BIT:  // 16位整数
-                FX_DEVMON_UpdateMonitor_Data_16BIT_form(device_type, buff, len);
-                break;
-            case FX_DEVMON_DISP_32BIT:  // 32位整数
-                FX_DEVMON_UpdateMonitor_Data_32BIT_form(device_type, buff, len);
-                break;
-            case FX_DEVMON_DISP_REAL:    // 实数(32位)
-                FX_DEVMON_UpdateMonitor_Data_REAL_form(device_type, buff, len);
-                break;
-            case FX_DEVMON_DISP_ASCII:   // ASCII字符
-                FX_DEVMON_UpdateMonitor_Data_ASCII_form(device_type, buff, len);
-                break;
-            default:
-                DEVMON_DEBUG("未知的显示格式: %d\r\n", g_monitor_config.display);
-                break;
+    if (out == NULL || out_size < 12u) {
+        return;
+    }
+    out[0] = 0;
+
+    if (!FX_DEVMON_RowIsValid(row)) {
+        out[0] = '-';
+        out[1] = '-';
+        out[2] = 0;
+        return;
+    }
+
+    v = g_data_rows[row].word_value;
+
+    /* 位类型：值只有 0 / 1（体现"位型"与"字型"的显示差异） */
+    if (FX_DEVMON_GetDataKind() == FX_DEVMON_KIND_BIT) {
+        sprintf(out, "%u", (unsigned)(g_data_rows[row].bit_values[0] ? 1u : 0u));
+        return;
+    }
+
+    switch (g_monitor_config.display) {
+    case FX_DEVMON_DISP_ASCII:                      /* 字符型 */
+        hi = (char)((v >> 8) & 0xFFu);
+        lo = (char)(v & 0xFFu);
+        if ((uint8_t)hi < 0x20u || (uint8_t)hi > 0x7Eu) {
+            hi = '.';
         }
+        if ((uint8_t)lo < 0x20u || (uint8_t)lo > 0x7Eu) {
+            lo = '.';
+        }
+        out[0] = hi;
+        out[1] = lo;
+        out[2] = 0;
+        break;
+
+    case FX_DEVMON_DISP_REAL:                       /* 实数(32位) */
+        FX_DEVMON_FormatReal(v, out);
+        break;
+
+    case FX_DEVMON_DISP_32BIT:                      /* 32 位整数 */
+        if (g_monitor_config.value_format == FX_DEVMON_VAL_HEX) {
+            sprintf(out, "%08X", (unsigned)v);
+        } else {
+            sprintf(out, "%d", (int)v);
+        }
+        break;
+
+    default:                                        /* 16 位整数 */
+        if (g_monitor_config.value_format == FX_DEVMON_VAL_HEX) {
+            sprintf(out, "%04X", (unsigned)(v & 0xFFFFu));
+        } else {
+            sprintf(out, "%d", (int)v);
+        }
+        break;
     }
 }
 
+/* 值列的样式类：位类型的"1"沿用现有 bit1 样式，其余不加样式 */
+static const char *FX_DEVMON_ValueCellClass(uint16_t row)
+{
+    if (FX_DEVMON_GetDataKind() == FX_DEVMON_KIND_BIT &&
+        FX_DEVMON_RowIsValid(row) &&
+        g_data_rows[row].bit_values[0] != 0u) {
+        return "bit1";
+    }
+    return "";
+}
 
-/*********************************************************************
- * @fn      FX_DEVMON_SendData_Table_Name
- *
- * @brief   发送数据行 软件表头 名称 
- *
- * @param   dev_name - 名称
- *          index_row - 起始行索引
- *
- * @return  none
- */
+/* ★ 表格上方的"类型说明 + 异常提示"（体现类型差异、并给出明确提示）
+ *   正常：显示一行 数据类别 / 显示格式 / 行数 / 每行字节数
+ *   异常：追加一行红字说明（类型不匹配、回帧不足、空数据、非法软元件） */
+static void FX_DEVMON_SendDataNotice(uint8_t Dest_Sock)
+{
+    char    *buffer = HtmlBuffer;
+    uint32_t offset = 0;
+    uint8_t  kind   = FX_DEVMON_GetDataKind();
+    const char *kind_str;
+    const char *disp_str;
+
+    if (kind == FX_DEVMON_KIND_BIT) {
+        kind_str = "位类型软元件(X/Y/M/S)";
+    } else if (kind == FX_DEVMON_KIND_WORD) {
+        kind_str = (g_monitor_config.monitor_type == FX_DEVMON_MONITOR_BUFFER)
+                   ? "字类型(缓冲存储器)" : "字类型软元件(D/R/T/C)";
+    } else {
+        kind_str = "未知类型";
+    }
+
+    switch (g_monitor_config.display) {
+    case FX_DEVMON_DISP_32BIT: disp_str = "32位整数";     break;
+    case FX_DEVMON_DISP_REAL:  disp_str = "实数(32位)";   break;
+    case FX_DEVMON_DISP_ASCII: disp_str = "ASCII字符";    break;
+    default:                   disp_str = "16位整数";     break;
+    }
+
+    offset += HTML_PACK(buffer, offset, "<div style=\"width:840px;margin:4px auto;font-size:12px;color:#333\">");
+    offset += HTML_PACK(buffer, offset, "数据类别：%s ｜ 值解析方式：%s ｜ 一页 %u 行 ｜ 每行 %u 字节",
+                        kind_str, disp_str,
+                        (unsigned)g_row_count,
+                        (unsigned)FX_DEVMON_BytesPerRow((uint8_t)g_monitor_config.display));
+    offset += HTML_PACK(buffer, offset, "</div>");
+    Data_Send(Dest_Sock, (uint8_t*)buffer, offset);
+
+    if (g_devmon_notice != 0u) {
+        offset = 0;
+        offset += HTML_PACK(buffer, offset, "<div style=\"width:840px;margin:4px auto;font-size:12px;color:#c00000\">注意：");
+        if (g_devmon_notice & FX_DEVMON_NOTICE_BADDEV) {
+            offset += HTML_PACK(buffer, offset, "软元件类型或起始编号超出范围，暂无可监视数据；");
+        }
+        if (g_devmon_notice & FX_DEVMON_NOTICE_EMPTY) {
+            offset += HTML_PACK(buffer, offset, "未收到有效数据（回帧为空）；");
+        }
+        if (g_devmon_notice & FX_DEVMON_NOTICE_TYPE) {
+            offset += HTML_PACK(buffer, offset, "显示格式与数据类别不匹配，已按 16 位整数显示；");
+        }
+        if (g_devmon_notice & FX_DEVMON_NOTICE_UNKNOWN) {
+            offset += HTML_PACK(buffer, offset, "未知的显示格式，已按 16 位整数显示；");
+        }
+        if (g_devmon_notice & FX_DEVMON_NOTICE_SHORT) {
+            offset += HTML_PACK(buffer, offset, "本轮回帧长度不足，未覆盖的行显示为 --；");
+        }
+        offset += HTML_PACK(buffer, offset, "</div>");
+        Data_Send(Dest_Sock, (uint8_t*)buffer, offset);
+    }
+}
+
 /* 表格布局视角下是否按"字(16 位)"展开：
  *   缓冲存储器：不涉及软元件类型，每行固定 1 个字 -> 按 16 位展开
  *   软元件    ：D/R/T/C 是字软元件 -> 按 16 位展开；X/Y/M/S 为位软元件 */
+void FX_DEVMON_UpdateMonitor_Data(u8 *buff, u16 len)
+{
+    uint8_t  kind;
+    uint8_t  display;
+    uint8_t  bytes_per_row;
+    uint16_t rows_ok;
+    uint16_t valid_rows;
+    uint16_t i;
+
+    /* ★ 本次解析的状态清零（保留"软元件非法"——它由取数前的配置判定设置，
+     *   不随回帧变化）。下面按实际情况重新置位，页面据它给出明确提示。 */
+    g_devmon_notice &= (uint8_t)~FX_DEVMON_NOTICE_BADDEV;
+
+    /* ① 判定数据类别：字类型 / 位类型 / 非法 —— 类型判定的唯一入口 */
+    kind = FX_DEVMON_GetDataKind();
+    if (kind == FX_DEVMON_KIND_NONE) {
+        DEVMON_DEBUG("数据类别非法: monitor_type=%d device_type=%d\r\n",
+                     g_monitor_config.monitor_type, g_monitor_config.device_type);
+        g_devmon_notice |= FX_DEVMON_NOTICE_TYPE;
+        for (i = 0; i < (uint16_t)FX_DEVMON_MAX_ROWS; i++) {
+            g_data_rows[i].is_valid = 0;
+        }
+        return;
+    }
+
+    /* ② 缓冲区与长度边界检查 */
+    if (buff == NULL || len == 0u) {
+        DEVMON_DEBUG("数据缓冲区为空\r\n");
+        g_devmon_notice |= FX_DEVMON_NOTICE_EMPTY;
+        for (i = 0; i < (uint16_t)FX_DEVMON_MAX_ROWS; i++) {
+            g_data_rows[i].is_valid = 0;
+        }
+        return;
+    }
+
+    /* ③ 显示格式与数据类别匹配检查：不匹配 -> 默认转换为 16 位整数 + 记录提示 */
+    display = (uint8_t)g_monitor_config.display;
+    if (display > (uint8_t)FX_DEVMON_DISP_ASCII) {
+        DEVMON_DEBUG("未知的显示格式: %d\r\n", display);
+        g_devmon_notice |= FX_DEVMON_NOTICE_UNKNOWN;
+    } else if (!FX_DEVMON_IsDisplayValid(kind, display)) {
+        DEVMON_DEBUG("显示格式与数据类别不匹配: kind=%d display=%d -> 16BIT\r\n", kind, display);
+        g_devmon_notice |= FX_DEVMON_NOTICE_TYPE;
+    } else {
+        DEVMON_DEBUG("显示格式与数据类别匹配: kind=%d display=%d\r\n", kind, display);
+    }
+    if (g_devmon_notice & (FX_DEVMON_NOTICE_TYPE | FX_DEVMON_NOTICE_UNKNOWN)) {
+        display = (uint8_t)FX_DEVMON_DISP_16BIT;    /* 默认转换 */
+        g_monitor_config.display = FX_DEVMON_DISP_16BIT;   /* 写回：页面单选显示实际生效值 */
+    }
+
+    /* ④ 回帧长度校验（边界）：本轮回帧能给几行"完整"数据 */
+    bytes_per_row = FX_DEVMON_BytesPerRow(display);
+    rows_ok = (uint16_t)(len / bytes_per_row);
+    if (rows_ok > (uint16_t)FX_DEVMON_MAX_ROWS) {
+        rows_ok = (uint16_t)FX_DEVMON_MAX_ROWS;
+    }
+
+    DEVMON_DEBUG("监视格式=%d 显示=%d 进制数=%d 位顺序=%d kind=%d len=%d 每行=%d字节\r\n",
+                 g_monitor_config.form,
+                 display,
+                 g_monitor_config.value_format,
+                 g_monitor_config.bit_order,
+                 kind, len, bytes_per_row);
+
+    /* ⑤ 分派：按"数据类别 + 显示格式"调用对应解析函数
+     *    （各解析函数内部还会区分 16 位软元件 / C200~C234 32 位计数器） */
+    if (g_monitor_config.monitor_type == FX_DEVMON_MONITOR_BUFFER) {
+        /* 缓冲存储器：F0 指令，按字取数 */
+        FX_DEVMON_UpdateMonitor_Data_16BIT_form((u8)g_monitor_config.device_type, buff, len);
+    } else {
+        switch (display) {
+        case FX_DEVMON_DISP_32BIT:
+            FX_DEVMON_UpdateMonitor_Data_32BIT_form((u8)g_monitor_config.device_type, buff, len);
+            break;
+
+        case FX_DEVMON_DISP_REAL:
+            FX_DEVMON_UpdateMonitor_Data_REAL_form((u8)g_monitor_config.device_type, buff, len);
+            break;
+
+        case FX_DEVMON_DISP_ASCII:
+            FX_DEVMON_UpdateMonitor_Data_ASCII_form((u8)g_monitor_config.device_type, buff, len);
+            break;
+
+        case FX_DEVMON_DISP_16BIT:
+        default:
+            FX_DEVMON_UpdateMonitor_Data_16BIT_form((u8)g_monitor_config.device_type, buff, len);
+            break;
+        }
+    }
+
+    /* ⑥ 标注每一行的有效性：本轮回帧覆盖到的行有效，其余无效
+     *    （值列对无效行显示 "--"，避免把上一轮的残留值当成当前值） */
+    valid_rows = (rows_ok < g_row_count) ? rows_ok : g_row_count;
+    for (i = 0; i < (uint16_t)FX_DEVMON_MAX_ROWS; i++) {
+        g_data_rows[i].is_valid = (i < valid_rows) ? 1u : 0u;
+    }
+    if (valid_rows < g_row_count) {
+        DEVMON_DEBUG("回帧长度不足: len=%d 需要=%d 字节\r\n",
+                     len, (int)((uint32_t)g_row_count * bytes_per_row));
+        g_devmon_notice |= FX_DEVMON_NOTICE_SHORT;
+    }
+}
+
 static uint8_t FX_DEVMON_LayoutIsWord(void)
 {
     uint8_t dev = (uint8_t)g_monitor_config.device_type;
@@ -631,6 +918,84 @@ static uint8_t FX_DEVMON_LayoutIsWord(void)
     return FX_DEVMON_IsWordDevice(dev);
 }
 
+/* ★ 配置归一化（页面渲染 / 发起取数之前统一调用一次，幂等）
+ *
+ * 目的：把"软元件类别"与"监视格式 form / 显示格式 display"这几项互斥的选项
+ *       收敛到合法组合，避免出现"字软元件按位显示""位的数值按 32 位整数显示"
+ *       这类无意义（甚至会把数据读错/显示错）的组合。
+ *
+ * 判断先后顺序（即本函数的执行次序）：
+ *   1) 先按"监视类型"分流：缓冲存储器 / 软元件
+ *        缓冲存储器 -> 本页每行固定取 1 个字、按 16 位展开：
+ *                       form 固定为 位＆字，display 固定为 16 位整数；
+ *   2) 软元件再按"是否字软元件"分类（D/R/T/C 为字；X/Y/M/S 为位）：
+ *        字软元件 -> form 固定为 位＆字：一个字里 16 个位并列显示。
+ *                    不允许退化成"一行一个位"的位格式 —— 本页一页只有
+ *                    FX_DEVMON_MAX_ROWS 行，位格式下 8 行只能看到 D0 的 8 个位，
+ *                    与"批量监视"的语义不符；display 保留用户选择(16/32/实数/ASCII)。
+ *        位软元件 -> display 固定为 16 位整数：位点只有 0/1，32 位整数/实数/
+ *                    ASCII 对它没有意义；form 保留用户选择(位 / 位＆字 / 位(8/10点))。
+ *
+ * 注意：归一化会写回 g_monitor_config，因此页面上的单选按钮会显示"实际生效"的
+ *       选项（例如给 X 选了 32 位，重绘后会回到 16 位），这是有意为之。
+ */
+static void FX_DEVMON_NormalizeConfig(void)
+{
+    uint8_t is_word;
+
+    if (g_monitor_config.monitor_type == FX_DEVMON_MONITOR_BUFFER) {
+        /* 缓冲存储器：每行 1 个字，按 16 位展开 */
+        g_monitor_config.form    = FX_DEVMON_FORM_WORD;
+        g_monitor_config.display = FX_DEVMON_DISP_16BIT;
+        return;
+    }
+
+    is_word = FX_DEVMON_IsWordDevice((uint8_t)g_monitor_config.device_type);
+
+    if (is_word) {
+        /* 字软元件 D/R/T/C：禁止按位显示 */
+        g_monitor_config.form = FX_DEVMON_FORM_WORD;
+    } else {
+        /* 位软元件 X/Y/M/S：数值只有 0/1，显示类型固定 16 位整数 */
+        g_monitor_config.display = FX_DEVMON_DISP_16BIT;
+    }
+}
+
+/* ★ 当前配置下"一行里有几个位(BIT)列"
+ * 表头、数据行、空行三处必须用同一个来源，否则列数不一致会导致表格错位
+ * （原实现三处各写一套 switch：空行里"位＆字"恒为 8 列，而字软元件数据行是 16 列，
+ *   于是空行比数据行窄一半）。
+ * 说明：调用前应已执行 FX_DEVMON_NormalizeConfig()。
+ */
+static uint8_t FX_DEVMON_BitColumnCount(void)
+{
+    switch (g_monitor_config.form) {
+    case FX_DEVMON_FORM_BIT:              /* 位：一行一个点 */
+        return 1;
+    case FX_DEVMON_FORM_BIT_8_10:         /* 位(8/10点)：一行 8 点 */
+        return 8;
+    default:                              /* 位＆字 */
+        if (FX_DEVMON_LayoutIsWord()) {
+            return 16;                    /* D/R/T/C 与缓冲存储器：一个字 16 位 */
+        }
+        if (g_monitor_config.device_type == FX_DEVMON_DEV_X ||
+            g_monitor_config.device_type == FX_DEVMON_DEV_Y) {
+            return 8;                     /* X/Y：8 进制软元件，显示 8 位 */
+        }
+        return 10;                        /* M/S 等：显示 10 位 */
+    }
+}
+
+/*********************************************************************
+ * @fn      FX_DEVMON_SendData_Table_Name
+ *
+ * @brief   生成第 index 行的"软元件名称"（类型前缀 + 编号）
+ *
+ * @param   dev_name - 输出缓冲
+ *          index    - 行索引
+ *
+ * @return  名称长度
+ */
 static uint16_t FX_DEVMON_SendData_Table_Name(char * dev_name , uint16_t index)
 {
     uint16_t offset = 0;
@@ -643,56 +1008,37 @@ static uint16_t FX_DEVMON_SendData_Table_Name(char * dev_name , uint16_t index)
          * 原实现丢弃了 sprintf 的返回值(offset 恒为 0)，编号从 dev_name[0] 开始写，
          * 把刚写好的类型前缀覆盖掉 -> 页面"软元件"列只剩编号(如 4/7)而没有 D4/D7。 */
         offset = (uint16_t)sprintf(dev_name, "%s", FX_DEVMON_GetDeviceTypeString(g_monitor_config.device_type));
-        switch (g_monitor_config.form) 
+        /* ★ 编号格式的判断顺序（配置已在 FX_DEVMON_NormalizeConfig() 中归一化）：
+         *   ① 先分"字软元件 / 位软元件"；
+         *   ② 字软元件：form 已固定为"位＆字"，一行一个软元件，编号 = 起址 + index；
+         *      位软元件：再分"位 / 位＆字"（一行一个点，编号 = 起址 + index）
+         *                与"位(8/10点)"（一行一组点，编号按组起点递增，沿用原口径）；
+         *   ③ X/Y 是 8 进制软元件，统一按 3 位 8 进制显示；其余按 10 进制。
+         * 原实现把"位"与"位＆字"两套完全相同的逻辑各写了一遍，这里合并为一处。 */
+        if (FX_DEVMON_IsWordDevice(g_monitor_config.device_type))
         {
-        case FX_DEVMON_FORM_BIT:
-            if (FX_DEVMON_LayoutIsWord() )
-            {
-                //字软元件 D,R,T,C
-                offset += sprintf(dev_name + offset, "%d.%02d",g_monitor_config.device_number + index/16, index%16);
-            }else{
-                //位软元件 X,Y,M,S等
-                if(g_monitor_config.device_type == FX_DEVMON_DEV_X || g_monitor_config.device_type == FX_DEVMON_DEV_Y)
-                {
-                    //XY 8进制 
-                    offset += sprintf(dev_name + offset, "%03o", (unsigned)(g_monitor_config.device_number + index));
-                }else{ //M,S,T,C 10进制
-                    offset += sprintf(dev_name + offset, "%d", g_monitor_config.device_number + index);
-                }
+            /* 字软元件 D/R/T/C：D0、D1 …（一行一个软元件） */
+            offset += sprintf(dev_name + offset, "%d", g_monitor_config.device_number + index);
+        }
+        else if (g_monitor_config.form == FX_DEVMON_FORM_BIT_8_10)
+        {
+            /* 位(8/10点)：一行一组点，编号按组起点递增（沿用原实现口径） */
+            if (g_monitor_config.device_type == FX_DEVMON_DEV_X ||
+                g_monitor_config.device_type == FX_DEVMON_DEV_Y) {
+                offset += sprintf(dev_name + offset, "%d", g_monitor_config.device_number + index*200);
+            } else {
+                offset += sprintf(dev_name + offset, "%d", g_monitor_config.device_number + index*8*10);
             }
-            break;
-        case FX_DEVMON_FORM_WORD:
-            if (FX_DEVMON_LayoutIsWord() )
-            {
-                //字软元件 D,R,T,C
-                offset += sprintf(dev_name + offset, "%d",g_monitor_config.device_number + index);  
-            }else{
-                //位软元件 X,Y,M,S等
-                if(g_monitor_config.device_type == FX_DEVMON_DEV_X || g_monitor_config.device_type == FX_DEVMON_DEV_Y)
-                {
-                    //XY 8进制 
-                    offset += sprintf(dev_name + offset, "%03o", (unsigned)(g_monitor_config.device_number + index));
-                }else{ //M,S,T,C 10进制
-                    offset += sprintf(dev_name + offset, "%d", g_monitor_config.device_number + index);
-                }
+        }
+        else
+        {
+            /* 位 / 位＆字：一行一个点（或一个软元件） */
+            if (g_monitor_config.device_type == FX_DEVMON_DEV_X ||
+                g_monitor_config.device_type == FX_DEVMON_DEV_Y) {
+                offset += sprintf(dev_name + offset, "%03o", (unsigned)(g_monitor_config.device_number + index));
+            } else {
+                offset += sprintf(dev_name + offset, "%d", g_monitor_config.device_number + index);
             }
-            break;
-        case FX_DEVMON_FORM_BIT_8_10:
-            if (FX_DEVMON_LayoutIsWord() )
-            {
-                //字软元件 D,R,T,C
-                offset += sprintf(dev_name + offset, "%d",g_monitor_config.device_number + index*8);
-            }else{
-                //位软元件 X,Y,M,S等
-                if(g_monitor_config.device_type == FX_DEVMON_DEV_X || g_monitor_config.device_type == FX_DEVMON_DEV_Y)
-                {
-                    //8进制XY 
-                    offset += sprintf(dev_name + offset, "%d",g_monitor_config.device_number + index*200 );
-                }else{ //M,S,T,C 10进制
-                    offset += sprintf(dev_name + offset, "%d",g_monitor_config.device_number + index*8*10 );
-                }
-            }
-        break;
         }
                 
     } else {
@@ -713,12 +1059,13 @@ static uint16_t FX_DEVMON_SendData_Table_Name(char * dev_name , uint16_t index)
  *          end_row - 结束行索引
  *
  * @return  none
- */
+*/
 static void FX_DEVMON_SendDataRows(uint8_t Dest_Sock, int start_row, int end_row)
 {
     char *temp_buffer = HtmlBuffer;
     char dev_name[32];
- 
+    char value_text[16];                    /* value cell buffer (see FX_DEVMON_FormatValueCell) */
+
     uint32_t offset;
     int i, j;
     
@@ -743,15 +1090,13 @@ static void FX_DEVMON_SendDataRows(uint8_t Dest_Sock, int start_row, int end_row
         case FX_DEVMON_FORM_BIT:   /* 位 */
         
             // 只显示第0位
-            offset += HTML_PACK(temp_buffer, offset, "<td class=\"c0\">%d</td>", g_data_rows[i].bit_values[0]);
-            // 数值
-            if (g_monitor_config.value_format == FX_DEVMON_VAL_HEX) {
-                offset += HTML_PACK(temp_buffer, offset, "<td>%04X</td>\r\n", (uint16_t)(g_data_rows[i].word_value & 0xFFFF));
-            } else {
-                offset += HTML_PACK(temp_buffer, offset, "<td>%d</td>\r\n", (int)g_data_rows[i].word_value);
-            }
+            offset += HTML_PACK(temp_buffer, offset, "<td class=\"%s\">%d</td>", g_data_rows[i].bit_values[0] ? "bit1" : "c0", g_data_rows[i].bit_values[0]);
+            /* value cell: typed formatting (-- when invalid, 0/1 for bit kinds, chars for ASCII, real for REAL) */
+            FX_DEVMON_FormatValueCell((uint16_t)i, value_text, (uint8_t)sizeof(value_text));
+            offset += HTML_PACK(temp_buffer, offset, "<td class=\"%s\">%s</td>\r\n", FX_DEVMON_ValueCellClass((uint16_t)i), value_text);
             break;
             
+
         case FX_DEVMON_FORM_WORD:        /* 位&字 */
             // 显示所有16位
             if (FX_DEVMON_LayoutIsWord() )
@@ -760,20 +1105,18 @@ static void FX_DEVMON_SendDataRows(uint8_t Dest_Sock, int start_row, int end_row
                 if (g_monitor_config.bit_order == FX_DEVMON_BIT_ORDER_F0) {
                     /* F-0 顺序 */
                     for (j = 0; j < 16; j++) {
-                        offset += HTML_PACK(temp_buffer, offset, "<td class=\"c0\">%d</td>", g_data_rows[i].bit_values[15 - j]);
+                        offset += HTML_PACK(temp_buffer, offset, "<td class=\"%s\">%d</td>", g_data_rows[i].bit_values[15 - j] ? "bit1" : "c0", g_data_rows[i].bit_values[15 - j]);
                     }
                 } else {
                     /* 0-F 顺序 */
                     for (j = 0; j < 16; j++) {
-                        offset += HTML_PACK(temp_buffer, offset, "<td class=\"c0\">%d</td>", g_data_rows[i].bit_values[j]);
+                        offset += HTML_PACK(temp_buffer, offset, "<td class=\"%s\">%d</td>", g_data_rows[i].bit_values[j] ? "bit1" : "c0", g_data_rows[i].bit_values[j]);
                     }
                 }
                 // 数值
-                if (g_monitor_config.value_format == FX_DEVMON_VAL_HEX) {
-                    offset += HTML_PACK(temp_buffer, offset, "<td>%04X</td>\r\n", (uint16_t)(g_data_rows[i].word_value & 0xFFFF));
-                } else {
-                    offset += HTML_PACK(temp_buffer, offset, "<td>%d</td>\r\n", (int)g_data_rows[i].word_value);
-                }
+                /* value cell: typed formatting (-- when invalid, 0/1 for bit kinds, chars for ASCII, real for REAL) */
+            FX_DEVMON_FormatValueCell((uint16_t)i, value_text, (uint8_t)sizeof(value_text));
+            offset += HTML_PACK(temp_buffer, offset, "<td class=\"%s\">%s</td>\r\n", FX_DEVMON_ValueCellClass((uint16_t)i), value_text);
                 
             }else{
                 if(g_monitor_config.device_type == FX_DEVMON_DEV_X || g_monitor_config.device_type == FX_DEVMON_DEV_Y)
@@ -782,39 +1125,35 @@ static void FX_DEVMON_SendDataRows(uint8_t Dest_Sock, int start_row, int end_row
                    if (g_monitor_config.bit_order == FX_DEVMON_BIT_ORDER_F0) {
                     /* F-0 顺序 */
                         for (j = 0; j < 8; j++) {
-                            offset += HTML_PACK(temp_buffer, offset, "<td class=\"c0\">%d</td>", g_data_rows[i].bit_values[8 - j]);
+                            offset += HTML_PACK(temp_buffer, offset, "<td class=\"%s\">%d</td>", g_data_rows[i].bit_values[8 - j] ? "bit1" : "c0", g_data_rows[i].bit_values[8 - j]);
                         }
                     } else {
                         /* 0-F 顺序 */
                         for (j = 0; j < 8; j++) {
-                            offset += HTML_PACK(temp_buffer, offset, "<td class=\"c0\">%d</td>", g_data_rows[i].bit_values[j]);
+                            offset += HTML_PACK(temp_buffer, offset, "<td class=\"%s\">%d</td>", g_data_rows[i].bit_values[j] ? "bit1" : "c0", g_data_rows[i].bit_values[j]);
                         }
                     }
                     // 数值 8位
-                    if (g_monitor_config.value_format == FX_DEVMON_VAL_HEX) {
-                        offset += HTML_PACK(temp_buffer, offset, "<td>%04X</td>\r\n", (uint16_t)(g_data_rows[i].word_value & 0xFF));
-                    } else {
-                        offset += HTML_PACK(temp_buffer, offset, "<td>%d</td>\r\n", (int)g_data_rows[i].word_value);
-                    }
+                    /* value cell: typed formatting (-- when invalid, 0/1 for bit kinds, chars for ASCII, real for REAL) */
+            FX_DEVMON_FormatValueCell((uint16_t)i, value_text, (uint8_t)sizeof(value_text));
+            offset += HTML_PACK(temp_buffer, offset, "<td class=\"%s\">%s</td>\r\n", FX_DEVMON_ValueCellClass((uint16_t)i), value_text);
                 }else{ 
                     //M,S,T,C 10进制
                      if (g_monitor_config.bit_order == FX_DEVMON_BIT_ORDER_F0) {
                     /* F-0 顺序 */
                         for (j = 0; j < 10; j++) {
-                            offset += HTML_PACK(temp_buffer, offset, "<td class=\"c0\">%d</td>", g_data_rows[i].bit_values[10 - j]);
+                            offset += HTML_PACK(temp_buffer, offset, "<td class=\"%s\">%d</td>", g_data_rows[i].bit_values[10 - j] ? "bit1" : "c0", g_data_rows[i].bit_values[10 - j]);
                         }
                     } else {
                         /* 0-F 顺序 */
                         for (j = 0; j < 10; j++) {
-                            offset += HTML_PACK(temp_buffer, offset, "<td class=\"c0\">%d</td>", g_data_rows[i].bit_values[j]);
+                            offset += HTML_PACK(temp_buffer, offset, "<td class=\"%s\">%d</td>", g_data_rows[i].bit_values[j] ? "bit1" : "c0", g_data_rows[i].bit_values[j]);
                         }
                     }
                     // 数值10位
-                    if (g_monitor_config.value_format == FX_DEVMON_VAL_HEX) {
-                        offset += HTML_PACK(temp_buffer, offset, "<td>%04X</td>\r\n", (uint16_t)(g_data_rows[i].word_value & 0x3FF));
-                    } else {
-                        offset += HTML_PACK(temp_buffer, offset, "<td>%d</td>\r\n", (int)(g_data_rows[i].word_value & 0x3FF));
-                    }
+                    /* value cell: typed formatting (-- when invalid, 0/1 for bit kinds, chars for ASCII, real for REAL) */
+            FX_DEVMON_FormatValueCell((uint16_t)i, value_text, (uint8_t)sizeof(value_text));
+            offset += HTML_PACK(temp_buffer, offset, "<td class=\"%s\">%s</td>\r\n", FX_DEVMON_ValueCellClass((uint16_t)i), value_text);
                 }
             }
             break;
@@ -837,19 +1176,9 @@ static void FX_DEVMON_SendDataRows(uint8_t Dest_Sock, int start_row, int end_row
                 }
             }
             // 数值
-            if (g_monitor_config.value_format == FX_DEVMON_VAL_HEX) {
-                offset += HTML_PACK(temp_buffer, offset, "<td>%04X%04X%04X%04X%04X%04X%04X%04X</td>\r\n", 
-                                                                g_data_rows[i].word_value ,
-                                                                g_data_rows[i+1].word_value,
-                                                                g_data_rows[i+2].word_value,
-                                                                g_data_rows[i+3].word_value,
-                                                                g_data_rows[i+4].word_value,
-                                                                g_data_rows[i+5].word_value,
-                                                                g_data_rows[i+6].word_value,
-                                                                g_data_rows[i+7].word_value);
-            } else {
-                offset += HTML_PACK(temp_buffer, offset, "<td>%d</td>\r\n", (int)g_data_rows[i].word_value);
-            }
+            /* value cell: typed formatting (-- when invalid, 0/1 for bit kinds, chars for ASCII, real for REAL) */
+            FX_DEVMON_FormatValueCell((uint16_t)i, value_text, (uint8_t)sizeof(value_text));
+            offset += HTML_PACK(temp_buffer, offset, "<td class=\"%s\">%s</td>\r\n", FX_DEVMON_ValueCellClass((uint16_t)i), value_text);
             i += 8;
 
             break;
@@ -857,9 +1186,10 @@ static void FX_DEVMON_SendDataRows(uint8_t Dest_Sock, int start_row, int end_row
         default:
             // 默认情况，显示所有16位和数值
             for (j = 0; j < 16; j++) {
-                offset += HTML_PACK(temp_buffer, offset, "<td class=\"c0\">%d</td>", g_data_rows[i].bit_values[j]);
+                offset += HTML_PACK(temp_buffer, offset, "<td class=\"%s\">%d</td>", g_data_rows[i].bit_values[j] ? "bit1" : "c0", g_data_rows[i].bit_values[j]);
             }
-            offset += HTML_PACK(temp_buffer, offset, "<td>%d</td>\r\n", (int)g_data_rows[i].word_value);
+            FX_DEVMON_FormatValueCell((uint16_t)i, value_text, (uint8_t)sizeof(value_text));
+            offset += HTML_PACK(temp_buffer, offset, "<td class=\"%s\">%s</td>\r\n", FX_DEVMON_ValueCellClass((uint16_t)i), value_text);
             break;
         }
         /* 注释 */
@@ -878,37 +1208,13 @@ static void FX_DEVMON_SendDataRows(uint8_t Dest_Sock, int start_row, int end_row
         offset += HTML_PACK(temp_buffer, offset, "<tr>\r\n");
         offset += HTML_PACK(temp_buffer, offset, "<td>&nbsp;</td>\r\n");
         
-        // 根据监视格式显示正确数量的空位列
-        switch (g_monitor_config.form)
-        {
-        case FX_DEVMON_FORM_BIT:   /* 位 */
-            // 只显示1个空位列
+        /* 空行列数必须与数据行列数完全一致（共用 FX_DEVMON_BitColumnCount()），
+         * 否则空行比数据行窄/宽，表格会错位。 */
+        for (j = 0; j < (int)FX_DEVMON_BitColumnCount(); j++) {
             offset += HTML_PACK(temp_buffer, offset, "<td>&nbsp;</td>\r\n");
-            break;
-            
-        case FX_DEVMON_FORM_WORD:   /* 位&字 */
-            // 显示8个空位列
-            for (j = 0; j < 8; j++) {
-                offset += HTML_PACK(temp_buffer, offset, "<td>&nbsp;</td>\r\n");
-            }
-            break;
-            
-        case FX_DEVMON_FORM_BIT_8_10:   /* 位(8/10点) */
-            // 显示16个空位列
-            for (j = 0; j < 16; j++) {
-                offset += HTML_PACK(temp_buffer, offset, "<td>&nbsp;</td>\r\n");
-            }
-            break;
-            
-        default:
-            // 默认显示16个空位列
-            for (j = 0; j < 16; j++) {
-                offset += HTML_PACK(temp_buffer, offset, "<td>&nbsp;</td>\r\n");
-            }
-            break;
         }
         
-        offset += HTML_PACK(temp_buffer, offset, "<td>&nbsp;</td>\r\n");
+        /* 空行的"值"列：与数据行一样只占 1 个单元格（原实现多出一格，空行比数据行宽 1 列）。 */
         offset += HTML_PACK(temp_buffer, offset, "<td>&nbsp;</td>\r\n");
         offset += HTML_PACK(temp_buffer, offset, "</tr>\r\n");
         
@@ -950,40 +1256,20 @@ static void FX_DEVMON_SendData_Table(uint8_t Dest_Sock)
     offset += HTML_PACK(buffer, offset, "<tr>\r\n<td width=\"80\">%s</td>\r\n", 
                      (g_monitor_config.monitor_type == FX_DEVMON_MONITOR_DEVICE) ? "软元件" : "缓冲存储器");
     
-    // 数据位列标题
-    switch (g_monitor_config.form) // 显示格式
-    {
-        case FX_DEVMON_FORM_BIT: // 位 只需要 1 列数据位显示
-            num = 1;
-            break;
-        case FX_DEVMON_FORM_WORD: // 位&字 只需要 8 列数据位显示
-            if (FX_DEVMON_LayoutIsWord() )
-            {
-                num = 16; //字软元件 D,R,T,C 显示所有16位
-            }else{
-                //位软元件 X,Y,M,S等
-                if(g_monitor_config.device_type == FX_DEVMON_DEV_X || g_monitor_config.device_type == FX_DEVMON_DEV_Y){
-                    num = 8;   //8进制 :XY  显示 8位
-                }else{ 
-                    num = 10;  //10进制:M,S,T,C  显示 10位
-                }
-            }
-            break;
-        case FX_DEVMON_FORM_BIT_8_10: // 位(8/10点)
-            num = 8;
-            break;
-    }
+    /* 数据位列标题：列数统一由"软元件类别 + 监视格式"决定（表头/数据行/空行三处共用同一函数，
+     * 原实现各写一套 switch，导致空行列数与数据行不一致、表格错位）。 */
+    num = FX_DEVMON_BitColumnCount();
     for (int i = 0; i < num; i++) {
         //位顺序
         if( g_monitor_config.bit_order == FX_DEVMON_BIT_ORDER_0F)  /* 0-F */
         {
-            offset += HTML_PACK(buffer, offset, "<td width=\"40\">+%X</td>", i);
+            offset += HTML_PACK(buffer, offset, "<td width=\"40\">%X</td>", i);
         }else{ /* F-0 */
-            offset += HTML_PACK(buffer, offset, "<td width=\"40\">+%X</td>", (num - 1 - i) );
+            offset += HTML_PACK(buffer, offset, "<td width=\"40\">%X</td>", (num - 1 - i) );
         }
     }
     // 值列标题
-    offset += HTML_PACK(buffer, offset, "\r\n<td width=\"60\">值</td>\r\n");
+    offset += HTML_PACK(buffer, offset, "\r\n<td width=\"110\">值</td>\r\n");
     // 表头行结束
     offset += HTML_PACK(buffer, offset, "</tr>\r\n");
     // 表头结束
@@ -1007,6 +1293,10 @@ static void FX_DEVMON_SendData_Table(uint8_t Dest_Sock)
  */
 void FX_DEVMON_SendWebPage(uint8_t Sour_Sock, uint8_t Dest_Sock, char *url, uint8_t fetch_data)
 {
+    /* ★ 渲染前先归一化配置：字软元件固定为"位＆字"、位软元件固定为"16 位整数"显示，
+     *   使表单选项、取数长度、表头列数、数据行渲染四者保持一致（见函数注释）。 */
+    FX_DEVMON_NormalizeConfig();
+
     char *temp_buffer = HtmlBuffer;  /* 使用HtmlBuffer作为发送缓冲区 */
     char *monitor_status;
     uint32_t offset;
@@ -1117,6 +1407,9 @@ void FX_DEVMON_SendWebPage(uint8_t Sour_Sock, uint8_t Dest_Sock, char *url, uint
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     
     /* 第十次打包: 数据表格 - 表头和部分数据行 */
+    /* type/notice bar above the table: data kind, value parse mode, boundary notices */
+    FX_DEVMON_SendDataNotice(Dest_Sock);
+
     FX_DEVMON_SendData_Table(Dest_Sock);    
 
     /* 第十一次打包: 数据表格 - 数据行1-5 */

@@ -1601,7 +1601,7 @@ void Web_Usart_Handler(uint8_t Sour_Sock ,uint8_t  Dest_Sock, uint8_t *buffer,ui
             break;
         }  
     }
-    HTTPS_DEBUG("current_page=%d\r\n",current_page);
+    HTTPS_DEBUG("current_page=%d-----",current_page);
     switch(current_page)
     {
         case HTML_PAGE_INDEX:
@@ -1659,6 +1659,6 @@ void Web_Usart_Handler(uint8_t Sour_Sock ,uint8_t  Dest_Sock, uint8_t *buffer,ui
     /* 收尾：UART 侧回帧触发的页面发送同样需要补发 chunked 结束块 */
     SX_End(Dest_Sock, current_page);
 
-    HTTPS_DEBUG("timestamp_diff= %uu \r\n", Html_time_get() - Web_Page_State[Sour_Sock].timestamp );
+    HTTPS_DEBUG("\r\ntimestamp_diff= %uu \r\n", Html_time_get() - Web_Page_State[Sour_Sock].timestamp );
  
 }

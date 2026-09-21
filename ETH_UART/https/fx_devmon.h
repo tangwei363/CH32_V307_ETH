@@ -177,7 +177,8 @@ typedef union
 typedef struct {
     uint16_t device_number;                 /* 软元件编号 */
     uint16_t bit_values[16];                /* 16个位的值 */
-    uint32_t word_value;                    /* 字值 */
+    uint32_t word_value;
+    uint8_t  is_valid;                      /* row covered by current reply? 0=invalid (value cell shows --) */                    /* 字值 */
 } fx_devmon_row_t;
 
 /*********************************************************************
