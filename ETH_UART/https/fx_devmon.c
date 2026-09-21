@@ -212,6 +212,29 @@ static char* FX_DEVMON_GetDeviceTypeString(fx_devmon_device_type_t dev_type)
  *
  * @return  none
  */
+/**
+ * @brief 写缓冲存储器单个字（F1「写入外扩模块」命令）
+ *   F1 帧: STX + "F1" + cmd + 地址(4B ASCII) + 长度(2B ASCII, 字节数)
+ *          + 数据(每字节 2B ASCII) + ETX + 校验和；PLC 返回 ACK(0x06)/NAK(0x15)。
+ *   数据按"低字节在前"发送（与 FX 缓冲存储器的字节序一致）。
+ * @param Sour_Sock/Dest_Sock socket
+ * @param g_address 缓冲存储器 G 地址
+ * @param value     16 位字值
+ * @return 0 成功，非 0 为 MELSEC_FX_ERR_* 错误码
+ */
+int FX_DEVMON_SetBufferWord(uint8_t Sour_Sock, uint8_t Dest_Sock, uint16_t g_address, uint16_t value)
+{
+    uint8_t data[2];
+    uint8_t module = (uint8_t)(g_monitor_config.buffer_module % 8u);
+
+    data[0] = (uint8_t)value;                 /* 低字节在前 */
+    data[1] = (uint8_t)(value >> 8);
+
+    return MELSEC_FX_BuildF1WriteCmd(Sour_Sock, Dest_Sock,
+                                     (uint8_t)(0x30 + module),
+                                     g_address, 2u, data);
+}
+
 void FX_DEVMON_UpdateMonitor_CMD(uint8_t Sour_Sock ,uint8_t  Dest_Sock )
 {
  
@@ -225,13 +248,33 @@ void FX_DEVMON_UpdateMonitor_CMD(uint8_t Sour_Sock ,uint8_t  Dest_Sock )
         }else{
             DEVMON_DEBUG("起始地址= 0x%04X \r\n", g_monitor_config.buffer_address );
         }
-        // 设置 缓冲存储器 数据表格行数量
-        if( g_monitor_config.buffer_address + FX_DEVMON_MAX_ROWS <= 32639 )
+        /* 行数：从起始地址最多显示 FX_DEVMON_MAX_ROWS 行，且不超过地址上限 32639 */
         {
-            FX_DEVMON_SetRow( FX_DEVMON_MAX_ROWS );
-        }else{
-            FX_DEVMON_SetRow( 32639 - g_monitor_config.buffer_address );
+            uint16_t rows = FX_DEVMON_MAX_ROWS;
+
+            if (((uint32_t)g_monitor_config.buffer_address + (uint32_t)FX_DEVMON_MAX_ROWS) > 32639u) {
+                rows = (uint16_t)(32639u - g_monitor_config.buffer_address);
+            }
+            FX_DEVMON_SetRow(rows);
+
+            /* 取数据：缓冲存储器走 F0「读取外扩模块」命令。
+             *   F0 帧: STX + "F0" + cmd + 地址(4B ASCII) + 长度(2B ASCII, 字节数) + ETX + 校验和
+             *   本页一行 = 1 个字(G 地址 +1)，故字节数 = 行数 * 2
+             *   (8 行 = 16 字节，远小于 uint8 上限 255，无需分批)。
+             *   cmd 字段按原厂语义携带模块号('0' + U 号)；若实测该字节为子命令，
+             *   改为固定 '0' 即可（模块号另议）。
+             *   回应同样为 STX + ASCII 十六进制 + ETX + 校验和，由现有 UART 分发
+             *   (HTTPS.c Web_Usart_Handler) 解码为二进制后交给 FX_DEVMON_UpdateMonitor_Data()。 */
+            if (rows > 0u) {
+                uint8_t module = (uint8_t)(g_monitor_config.buffer_module % 8u);
+                (void)MELSEC_FX_BuildF0ReadCmd(Sour_Sock, Dest_Sock,
+                                               (uint8_t)(0x30 + module),
+                                               g_monitor_config.buffer_address,
+                                               (uint8_t)(rows * 2u));
+            }
         }
+
+        
     }
     else  
     {
@@ -575,6 +618,19 @@ void FX_DEVMON_UpdateMonitor_Data(u8 *buff, u16 len)
  *
  * @return  none
  */
+/* 表格布局视角下是否按"字(16 位)"展开：
+ *   缓冲存储器：不涉及软元件类型，每行固定 1 个字 -> 按 16 位展开
+ *   软元件    ：D/R/T/C 是字软元件 -> 按 16 位展开；X/Y/M/S 为位软元件 */
+static uint8_t FX_DEVMON_LayoutIsWord(void)
+{
+    uint8_t dev = (uint8_t)g_monitor_config.device_type;
+
+    if (g_monitor_config.monitor_type == FX_DEVMON_MONITOR_BUFFER) {
+        return 1;
+    }
+    return FX_DEVMON_IsWordDevice(dev);
+}
+
 static uint16_t FX_DEVMON_SendData_Table_Name(char * dev_name , uint16_t index)
 {
     uint16_t offset = 0;
@@ -590,7 +646,7 @@ static uint16_t FX_DEVMON_SendData_Table_Name(char * dev_name , uint16_t index)
         switch (g_monitor_config.form) 
         {
         case FX_DEVMON_FORM_BIT:
-            if (FX_DEVMON_IsWordDevice(g_monitor_config.device_type) )
+            if (FX_DEVMON_LayoutIsWord() )
             {
                 //字软元件 D,R,T,C
                 offset += sprintf(dev_name + offset, "%d.%02d",g_monitor_config.device_number + index/16, index%16);
@@ -599,14 +655,14 @@ static uint16_t FX_DEVMON_SendData_Table_Name(char * dev_name , uint16_t index)
                 if(g_monitor_config.device_type == FX_DEVMON_DEV_X || g_monitor_config.device_type == FX_DEVMON_DEV_Y)
                 {
                     //XY 8进制 
-                    offset += sprintf(dev_name + offset, "%d%d",g_monitor_config.device_number + index%8, index/8);
+                    offset += sprintf(dev_name + offset, "%03o", (unsigned)(g_monitor_config.device_number + index));
                 }else{ //M,S,T,C 10进制
-                    offset += sprintf(dev_name + offset, "%d",g_monitor_config.device_number );
+                    offset += sprintf(dev_name + offset, "%d", g_monitor_config.device_number + index);
                 }
             }
             break;
         case FX_DEVMON_FORM_WORD:
-            if (FX_DEVMON_IsWordDevice(g_monitor_config.device_type) )
+            if (FX_DEVMON_LayoutIsWord() )
             {
                 //字软元件 D,R,T,C
                 offset += sprintf(dev_name + offset, "%d",g_monitor_config.device_number + index);  
@@ -615,14 +671,14 @@ static uint16_t FX_DEVMON_SendData_Table_Name(char * dev_name , uint16_t index)
                 if(g_monitor_config.device_type == FX_DEVMON_DEV_X || g_monitor_config.device_type == FX_DEVMON_DEV_Y)
                 {
                     //XY 8进制 
-                    offset += sprintf(dev_name + offset, "%d",g_monitor_config.device_number + index/8 );
+                    offset += sprintf(dev_name + offset, "%03o", (unsigned)(g_monitor_config.device_number + index));
                 }else{ //M,S,T,C 10进制
-                    offset += sprintf(dev_name + offset, "%d",g_monitor_config.device_number + index/10 );
+                    offset += sprintf(dev_name + offset, "%d", g_monitor_config.device_number + index);
                 }
             }
             break;
         case FX_DEVMON_FORM_BIT_8_10:
-            if (FX_DEVMON_IsWordDevice(g_monitor_config.device_type) )
+            if (FX_DEVMON_LayoutIsWord() )
             {
                 //字软元件 D,R,T,C
                 offset += sprintf(dev_name + offset, "%d",g_monitor_config.device_number + index*8);
@@ -641,7 +697,7 @@ static uint16_t FX_DEVMON_SendData_Table_Name(char * dev_name , uint16_t index)
                 
     } else {
         /* 缓冲存储器 名称*/
-        sprintf(dev_name, "U%d\\G%d", g_monitor_config.buffer_module,g_monitor_config.buffer_address + index * 16);
+        sprintf(dev_name, "U%d\\G%d", g_monitor_config.buffer_module,g_monitor_config.buffer_address + index);
     }
 
     return strlen( dev_name );
@@ -696,7 +752,7 @@ static void FX_DEVMON_SendDataRows(uint8_t Dest_Sock, int start_row, int end_row
             
         case FX_DEVMON_FORM_WORD:        /* 位&字 */
             // 显示所有16位
-            if (FX_DEVMON_IsWordDevice(g_monitor_config.device_type) )
+            if (FX_DEVMON_LayoutIsWord() )
             {
                 //字软元件 D,R,T,C
                 if (g_monitor_config.bit_order == FX_DEVMON_BIT_ORDER_F0) {
@@ -894,7 +950,7 @@ static void FX_DEVMON_SendData_Table(uint8_t Dest_Sock)
             num = 1;
             break;
         case FX_DEVMON_FORM_WORD: // 位&字 只需要 8 列数据位显示
-            if (FX_DEVMON_IsWordDevice(g_monitor_config.device_type) )
+            if (FX_DEVMON_LayoutIsWord() )
             {
                 num = 16; //字软元件 D,R,T,C 显示所有16位
             }else{
@@ -1153,7 +1209,14 @@ void FX_DEVMON_METHOD_POST(uint8_t Sour_Sock ,uint8_t  Dest_Sock,  char *http_re
             }
             else if (strcmp(key, "DEVN") == 0)
             {
-                g_monitor_config.device_number = atoi(decoded_value);
+                /* X/Y 是 8 进制软元件（显示也是 3 位 8 进制），输入按 8 进制解析；其余按 10 进制。
+                 * 表单里 DEVT 排在 DEVN 之前，类型此时已确定。 */
+                if (g_monitor_config.device_type == FX_DEVMON_DEV_X ||
+                    g_monitor_config.device_type == FX_DEVMON_DEV_Y) {
+                    g_monitor_config.device_number = (uint16_t)strtol(decoded_value, NULL, 8);
+                } else {
+                    g_monitor_config.device_number = (uint16_t)atoi(decoded_value);
+                }
                 DEVMON_DEBUG("软元件编号:%d \r\n",g_monitor_config.device_number);
             }
             else if (strcmp(key, "MDL") == 0)
