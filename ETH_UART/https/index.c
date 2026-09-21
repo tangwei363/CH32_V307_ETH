@@ -25,10 +25,13 @@ static uint8_t  mitsu_table_sock = 0xFF;
 #define MITSU_TABLE_EMIT_LIMIT    (MITSU_TABLE_BUFFER_SIZE - 32)
 
 /* 主页内容：品牌 / 型号 / 用途，三段式排版（样式见共享 CSS 的 .hero* 规则）
- * 说明：标题层级用 h1，桌面 40px、窄屏 26px（见 CSS 媒体查询），与页脚风格统一。 */
+ * 说明：标题层级用 h1，桌面 40px、窄屏 26px（见 CSS 媒体查询），与页脚风格统一。
+ *       段落间距由 CSS 的 .hero* margin 控制（想再大/再小改那几处即可）。
+ *       "小崎科技"是超链接：指向公司主页 gdxq.cn，新窗口打开，
+ *       避免点击后离开本机的监视页面。 */
 const char Html_Index_Content[] =
     "<div class=\"hero\">\r\n"
-    "<div class=\"hero-brand\">小崎科技</div>\r\n"
+    "<div class=\"hero-brand\"><a href=\"http://gdxq.cn\" target=\"_blank\" title=\"小崎科技 公司主页\">小崎科技</a></div>\r\n"
     "<h1 class=\"hero-title\">MELSEC-F FX3U-ENET-ADP</h1>\r\n"
     "<div class=\"hero-sub\">数据监控</div>\r\n"
     "<div class=\"hero-line\"></div>\r\n"

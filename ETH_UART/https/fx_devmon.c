@@ -1293,7 +1293,9 @@ static void FX_DEVMON_SendData_Table(uint8_t Dest_Sock)
     // 表格容器
     offset += HTML_PACK(buffer, offset, "<div style=\"overflow:auto; height:400px; width:840px; margin:0 auto\">\r\n");
     // 表格开始
-    offset += HTML_PACK(buffer, offset, "<table border=\"1\" rules=\"all\" cellspacing=\"0\" cellpadding=\"0\" style=\"table-layout:fixed; font-size:12px\">\r\n");
+    /* 字体比原 12px 大一档(13px)；位格宽高同步 28->30px，
+     * 保持"字/格"比例不变；总宽 80+16*30+110=670px < 840px 容器，不溢出 */
+    offset += HTML_PACK(buffer, offset, "<table border=\"1\" rules=\"all\" cellspacing=\"0\" cellpadding=\"0\" style=\"table-layout:fixed; font-size:13px\">\r\n");
     // 表头开始
     offset += HTML_PACK(buffer, offset, "<thead>\r\n");
     
@@ -1310,9 +1312,9 @@ static void FX_DEVMON_SendData_Table(uint8_t Dest_Sock)
         {
             /* 表头位单元：宽高一致(正方形)，列宽由本行决定(table-layout:fixed)，
              * 数据行再用 c0/bit1 的 height 保持一致 */
-            offset += HTML_PACK(buffer, offset, "<td width=\"28\" height=\"28\">%X</td>", i);
+            offset += HTML_PACK(buffer, offset, "<td width=\"30\" height=\"30\">%X</td>", i);
         }else{ /* F-0 */
-            offset += HTML_PACK(buffer, offset, "<td width=\"28\" height=\"28\">%X</td>", (num - 1 - i) );
+            offset += HTML_PACK(buffer, offset, "<td width=\"30\" height=\"30\">%X</td>", (num - 1 - i) );
         }
     }
     // 值列标题
