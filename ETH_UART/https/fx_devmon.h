@@ -30,7 +30,6 @@ extern "C" {
  * 宏定义
  *********************************************************************/
 #define FX_DEVMON_MAX_ROWS          8       /* 最大显示行数(32→8: g_data_rows 由2432B降至384B, 回收SRAM) */
-#define FX_DEVMON_MAX_COMMENT_LEN   8       /* 注释最大长度(32→8: 每行再省24B, 共省192B) */
 #define FX_DEVMON_DEFAULT_INTERVAL  5       /* 默认刷新间隔(秒) */
 #define FX_DEVMON_MIN_INTERVAL      5       /* 最小刷新间隔 */
 #define FX_DEVMON_MAX_INTERVAL      120     /* 最大刷新间隔 */
@@ -85,12 +84,6 @@ typedef enum {
     FX_DEVMON_BIT_ORDER_F0                  /* F-0 */
 } fx_devmon_bit_order_t;
 
-/* 注释显示枚举 */
-typedef enum {
-    FX_DEVMON_COMMENT_NONE = 0,             /* 不显示 */
-    FX_DEVMON_COMMENT_SHOW                  /* 显示 */
-} fx_devmon_comment_t;
-
 /* 监视状态枚举 */
 typedef enum {
     FX_DEVMON_STOPPED = 0,                  /* 监视停止 */
@@ -112,7 +105,6 @@ typedef struct {
     fx_devmon_display_t display;            /* 显示类型 */
     fx_devmon_value_t value_format;         /* 进制数 */
     fx_devmon_bit_order_t bit_order;        /* 位顺序 */
-    fx_devmon_comment_t comment;            /* 注释显示 */
     uint8_t update_interval;                /* 自动更新间隔时间(秒) */
 } fx_devmon_config_t;
 
@@ -162,7 +154,6 @@ typedef struct {
     uint16_t device_number;                 /* 软元件编号 */
     uint16_t bit_values[16];                /* 16个位的值 */
     uint32_t word_value;                    /* 字值 */
-    char comment[FX_DEVMON_MAX_COMMENT_LEN + 1]; /* 注释 */
 } fx_devmon_row_t;
 
 /*********************************************************************

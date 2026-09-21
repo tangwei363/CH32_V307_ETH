@@ -274,11 +274,10 @@ void WCHNET_UdpServerRecv(struct _SOCK_INF *socinf, u32 ipaddr, u16 port, u8 *bu
 
                 //ethernet_connect_set(S_id,1);      // UDP 连接成功
             #if SOCKET_HTTP_EN        
-                // FX_ACCLOG_AddRecord(S_id, ETH_TYPE_UDP, 
-                //                     eth_socket[S_id].Pro_Type,
-                //                     SocketInf_t->IPAddr);
-
-                //WCHNET_UpdateAccLog();             //更新访问记录到PLC的寄存器中 
+                FX_ACCLOG_AddRecord(S_id, ETH_TYPE_UDP, 
+                                    eth_socket[S_id].Pro_Type,
+                                    SocketInf_t->IPAddr);
+                WCHNET_UpdateAccLog();             //更新访问记录到PLC的寄存器中 
             #endif         
                 break;
             }
@@ -468,10 +467,10 @@ void WCHNET_HandleSockInt(u8 socketid, u8 intstat)
             #endif    
                 socket_ctrl[socketid].eth_sid = S_id;              /* 缓存映射：后续 RECV 时 O(1) 查找 */
             #if SOCKET_HTTP_EN  
-                // FX_ACCLOG_AddRecord(S_id, ETH_TYPE_TCP,
-                //                     eth_socket[S_id].Pro_Type,
-                //                     SocketInf_t->IPAddr);         /* 记录访问日志 */
-                //WCHNET_UpdateAccLog();                            /* 同步日志到 PLC */
+                FX_ACCLOG_AddRecord(S_id, ETH_TYPE_TCP,
+                                    eth_socket[S_id].Pro_Type,
+                                    SocketInf_t->IPAddr);         /* 记录访问日志 */
+                WCHNET_UpdateAccLog();                            /* 同步日志到 PLC */
             #endif         
                 break;
             }

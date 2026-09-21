@@ -75,7 +75,9 @@ static const char HTML_Component_Nav_Bar_Responsive[] =
 
 /* 新版页脚 (index.c) */
 static const char HTML_Component_Footer_New[] =
-    "<div class=\"f\">020-32382254<br>xq001@gdxq.xyz<br>广州高新技术产业开发区风信路1号110房<br>备案号：粤ICP备2024253175号<br>Copyright &#169; 2024 小崎科技</div>\r\n"
+    /* 页脚：分割横线 + 公司信息（全部行内样式，不依赖共享 CSS 是否被浏览器应用） */
+    "<hr style=\"width:800px;max-width:96%;margin:18px auto 0 auto;border:0;border-top:1px solid #000000\">\r\n"
+    "<div class=\"f\" style=\"font-size:12px;text-align:center;line-height:1.7;padding:12px 0\">020-32382254<br>xq001@gdxq.xyz<br>广州高新技术产业开发区风信路1号110房<br>备案号：粤ICP备2024253175号<br>Copyright &#169; 2024 小崎科技</div>\r\n"
     "</div>\r\n"
     /*
      * SX 客户端：接收端（浏览器）重组与校验辅助。

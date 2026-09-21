@@ -16,6 +16,7 @@
 #include "html_components.h"
 #include "index.h"
 #include "ethernet_app.h"
+#include "eth_driver.h"        /* SocketInf[]：查询套接字真实连接状态(OPEN LED 用) */
 #include "bsp_uart.h"
 /* 全局变量定义 */
 static fx_enetinf_adapter_t g_adapter_info;
@@ -28,6 +29,40 @@ static const char* FX_ENETINF_LEDClass(fx_enetinf_led_state_t st)
     if (st == FX_ENET_LED_GREEN) { return "ledg"; }
     if (st == FX_ENET_LED_ON)    { return "ledr"; }
     return "off";
+}
+
+/* ★ LED 实时刷新（原实现只在 FX_ENETINF_Init 里赋一次固定值，页面 4 个色块永远是静态的）。
+ * 数据源全部取工程内已在维护的实时量，不引入新依赖：
+ *   POWER：net_status.bit.link_b7  —— PHY 链路连通(bsp_wch_net.c 的 PHY 变化处理中维护)
+ *   100M ：net_status.bit.speed_b2 —— 链路速率 100Mbps(ethernet_app.c 初始化时置位)
+ *   ERR. ：任一套接字带错误码 eth_socket[i].Error_Code != 0 → 红灯(错误锁存，与硬件一致)
+ *   OPEN ：WCHNET 套接字表中任一连接已建立(SockStatus: TCP=ESTABLISHED / UDP=已开放) → 绿灯
+ * 由 FX_ENETINF_SendWebPage() 在每次渲染前调用一次。 */
+static void FX_ENETINF_UpdateLEDs(void)
+{
+    uint8_t i;
+    uint8_t has_err  = 0;
+    uint8_t has_open = 0;
+
+    for (i = 0; i < ETH_MAX_CONNECTIONS; i++) {
+        if (eth_socket[i].Error_Code != 0u) {
+            has_err = 1;
+        }
+        /* OPEN：WCHNET 套接字表中任一连接已建立 → 绿灯
+         * SockStatus 低字节 = 套接字状态(SOCK_STAT_OPEN)，次低字节 = TCP 状态
+         * (wchnet.h 定义，仅 TCP 模式有意义)；UDP 无连接概念，只要套接字已开放即计入。 */
+        if (((SocketInf[i].SockStatus & 0xFFu) == SOCK_STAT_OPEN) &&
+            ((SocketInf[i].ProtoType != PROTO_TYPE_TCP) ||
+             (((SocketInf[i].SockStatus >> 8) & 0xFFu) == TCP_ESTABLISHED))) {
+            has_open = 1;
+        }
+    }
+
+    g_adapter_info.led_power = net_status.bit.link_b7 ? FX_ENET_LED_GREEN : FX_ENET_LED_OFF;
+    g_adapter_info.led_100m  = (net_status.bit.link_b7 && net_status.bit.speed_b2)
+                               ? FX_ENET_LED_GREEN : FX_ENET_LED_OFF;
+    g_adapter_info.led_err   = has_err  ? FX_ENET_LED_ON    : FX_ENET_LED_OFF;
+    g_adapter_info.led_open  = has_open ? FX_ENET_LED_GREEN : FX_ENET_LED_OFF;
 }
  
 fx_enetinf_error_log_t g_error_logs[FX_ENETINF_MAX_ERRORS];
@@ -47,6 +82,7 @@ static char* FX_ENETINF_GenerateErrorTable(void);
  */
 void FX_ENETINF_Init(void)
 {
+    uint8_t qsize;                                      // 钳位后的队列容量
     /* 初始化适配器信息 - 示例值 */
     g_adapter_info.version = 0x0122;  /* 版本1.22 */
     /* 设置LED状态 */
@@ -56,7 +92,15 @@ void FX_ENETINF_Init(void)
     g_adapter_info.led_open = FX_ENET_LED_GREEN;   /* OPEN灯常亮 */
     
     /* 初始化错误履历队列 */
-    FIFO_Init(&g_error_fifo, g_error_logs, sizeof(fx_enetinf_error_log_t), log_data.error_log_target_cnt);
+    /* 同类钳位（与 fx_acclog 一致）：PLC 侧件数上限 16，而 g_error_logs[]
+     * 只有 FX_ENETINF_MAX_ERRORS 个元素，直接透传同样会越界写穿 BSS；
+     * 为 0 时 head % 0 会算出野偏移指针。 */
+    qsize = log_data.error_log_target_cnt;
+    if (qsize == 0u || qsize > FX_ENETINF_MAX_ERRORS) {
+        qsize = FX_ENETINF_MAX_ERRORS;
+    }
+
+    FIFO_Init(&g_error_fifo, g_error_logs, sizeof(fx_enetinf_error_log_t), qsize);
 
     printf("FX3U-ENET-ADP信息模块初始化完成\r\n");
 }
@@ -243,13 +287,34 @@ void FX_ErrorLogs_SendAccess_PLC(void)
  *
  * @return  表格HTML字符串
  */
+/* ── 记录字段 → 显示文本（值域映射，禁止用原始编码当数组下标）──
+ * 与 fx_acclog.c 同因：protocol/open_type 是原始编码(0x01/0x02、0xA0~0xA8)，
+ * 若直接索引 2~4 元素数组会越界读到野指针，再由 sprintf("%s") 解引用，导致死机。 */
+static const char* FX_ENETINF_ProtoStr(uint16_t protocol)
+{
+    switch (protocol) {
+        case (uint16_t)ETH_TYPE_TCP: return "TCP";
+        case (uint16_t)ETH_TYPE_UDP: return "UDP";
+        default:                     return "----";
+    }
+}
+
+static const char* FX_ENETINF_OpenStr(uint16_t open_type)
+{
+    switch (open_type) {
+        case (uint16_t)PRO_TCPC_MELSOFT: return "MELSOFT连接";
+        case (uint16_t)PRO_TCPC_MC:      return "MC协议";
+        case (uint16_t)PRO_UDPC_MC:      return "MC协议";
+        case (uint16_t)PRO_TCP_HTTP:     return "数据监视";
+        default:                         return "----";
+    }
+}
+
 static char* FX_ENETINF_GenerateErrorTable(void)
 {
     char *table_buffer = MITSU_HTTP_GetTableBuffer();
     char *temp_buffer = HtmlBuffer;
     uint8_t i;
-    const char* proto_str[] = {"TCP", "UDP"};
-    const char* open_str[] = {"MELSOFT", "MC", "数据监视", "未知"};
     
     MITSU_HTTP_ClearTableBuffer();
     
@@ -298,8 +363,8 @@ static char* FX_ENETINF_GenerateErrorTable(void)
                     "<td>%02d:%02d:%02d</td>\r\n"
                     "</tr>\r\n",
                     latest_log.conn_id,
-                    proto_str[latest_log.protocol],
-                    open_str[latest_log.open_type],
+                    FX_ENETINF_ProtoStr(latest_log.protocol),
+                    FX_ENETINF_OpenStr(latest_log.open_type),
                     latest_log.local_port,
                     latest_log.error_code,
                     latest_log.remote_ip[0], latest_log.remote_ip[1],
@@ -331,8 +396,8 @@ static char* FX_ENETINF_GenerateErrorTable(void)
                     "</tr>\r\n",
                     log_index,
                     log.conn_id,
-                    proto_str[log.protocol],
-                    open_str[log.open_type],
+                    FX_ENETINF_ProtoStr(log.protocol),
+                    FX_ENETINF_OpenStr(log.open_type),
                     log.local_port,
                     log.error_code,
                     log.remote_ip[0], log.remote_ip[1],
@@ -441,6 +506,8 @@ void FX_ENETINF_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,char *url)
     uint32_t offset;
     /* 更新监视状态 */
     FX_ENETINF_UpdateMonitor();
+    /* ★ 刷新 POWER/100M/ERR./OPEN 四个 LED 的实时状态（页面下方 LED 段的数据源） */
+    FX_ENETINF_UpdateLEDs();
  
     /* 获取监控状态 */
     monitor_status  = (char*) HTML_GetStateString(net_monitor_state);

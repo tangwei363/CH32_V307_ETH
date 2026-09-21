@@ -13,12 +13,26 @@
 #include <stdio.h>
 #include "index.h"
 #include "ethernet_app.h"
+#include "melsec_fx_tables.h"   /* FX_E0_E1_Tables：软元件编号范围(eStart/eEnd)校验 */
 /*********************************************************************
  * 全局变量定义
  *********************************************************************/
 static fx_devmon_config_t g_monitor_config;
 static fx_devmon_row_t g_data_rows[FX_DEVMON_MAX_ROWS];
 static uint8_t g_row_count = 0;
+
+/* ── 监视数据的字节/字序约定（与 PLC 侧一致，改动前请先看第 4 条的实测方法）──
+ * 1) UART 回帧的数据段是 ASCII 十六进制文本，由 HTTPS.c 的 Web_Usart_Handler
+ *    先调 hex_str_to_intlend() 解码为二进制（ASCII "12AB" → 字节 0x12,0xAB，
+ *    即 buf[0]=低字节、buf[1]=高字节）。
+ * 2) 16 位字： word = buf[n] | (buf[n+1] << 8)           见 ..._16BIT_form
+ * 3) 32 位整数/实数：低位字在前 —— word0 = buf[0..1]、word1 = buf[2..3]，
+ *    value = (word1 << 16) | word0，即
+ *    (buf[3]<<24)|(buf[2]<<16)|(buf[1]<<8)|buf[0]   见 ..._32BIT/REAL_form
+ *    这与三菱 FX"32 位数据低位字在 D(n)"的约定一致。
+ * 4) 实测确认：PLC 侧 D100=0x5678、D101=0x1234 → 页面应显示 305419896；
+ *    实数：PLC 侧 D100=0xF5C3、D101=0x4048(即 3.14f) → 页面应显示 3.14。
+ */
  
 
 
@@ -50,7 +64,6 @@ void FX_DEVMON_Init(void)
     g_monitor_config.display = FX_DEVMON_DISP_16BIT;           /* 显示格式：16位整数 */
     g_monitor_config.value_format = FX_DEVMON_VAL_DECIMAL;     /* 数值格式：10进制 */
     g_monitor_config.bit_order = FX_DEVMON_BIT_ORDER_F0;       /* 位顺序：F-0（高位在前） */
-    g_monitor_config.comment = FX_DEVMON_COMMENT_SHOW;         /* 注释显示：显示 */
     g_monitor_config.update_interval = FX_DEVMON_DEFAULT_INTERVAL; /* 自动更新间隔：默认5秒 */
     
     /* 清空数据 */
@@ -233,26 +246,50 @@ void FX_DEVMON_UpdateMonitor_CMD(uint8_t Sour_Sock ,uint8_t  Dest_Sock )
 #endif
         // 根据软元件名 解析软元件类型
        // uint8_t MC_device_type = FX_DEVMON_DeviceCodeToType(device_type);
-        uint16_t map_max_addr = 0;
-       // uint16_t map_min_addr = 0;
-        // 设置 缓冲存储器 数据表格行数量
-        if( g_monitor_config.device_number + FX_DEVMON_MAX_ROWS <= map_max_addr )
+        /* ★ 行数/请求点数按"软元件真实编号范围"裁剪。
+         * 原实现 map_max_addr 恒为 0（死代码），判断永远走 else，靠 uint16 回绕 +
+         * SetRow 内部钳位侥幸得到行数，"地址范围校验"实际从未生效。
+         * 现从 E0/E1 映射表取该软元件类型的最大编号 eEnd(melsec_fx_tables.h)：
+         *   表中无此类型 或 起始编号越界   → 不监视(0 行，页面不显示数据行)
+         *   起始编号 + MAX_ROWS - 1 <= eEnd → 满行
+         *   否则按剩余点数裁剪               → 同时缩短 MC 请求点数，
+         *                                      避免读到 PLC 最大地址之外被回错误码
+         */
         {
-            FX_DEVMON_SetRow( FX_DEVMON_MAX_ROWS );
-        }else{
-            FX_DEVMON_SetRow( map_max_addr - g_monitor_config.device_number);
+            uint16_t dev_end = 0;
+            uint16_t rows;
+            uint8_t  k;
+
+            for (k = 0; k < TABLE_E0_E1_SIZE; k++) {
+                if (FX_E0_E1_Tables[k].e_code == net_mc_meta.device_name) {
+                    dev_end = FX_E0_E1_Tables[k].eEnd;
+                    break;
+                }
+            }
+
+            if (k >= TABLE_E0_E1_SIZE || device_number > dev_end) {
+                DEVMON_DEBUG("软元件类型/起始编号非法: code=0x%04X num=%d\r\n",
+                             net_mc_meta.device_name, device_number);
+                rows = 0;
+            } else if (((uint32_t)device_number + (uint32_t)FX_DEVMON_MAX_ROWS - 1u) <= (uint32_t)dev_end) {
+                rows = FX_DEVMON_MAX_ROWS;
+            } else {
+                rows = (uint16_t)(dev_end - device_number + 1u);
+            }
+
+            FX_DEVMON_SetRow(rows);
+            device_count = rows;      /* 请求点数与显示行数保持一致 */
         }
 #ifdef _FX_DEVMON_DEBUG
-        DEVMON_DEBUG("MC_device_type:0x%02X\r\n",MC_device_type);
+        DEVMON_DEBUG("device_name:0x%04X\r\n", net_mc_meta.device_name);   /* 原引用已注释掉的 MC_device_type，会导致 -D_FX_DEVMON_DEBUG 编译失败 */
 
         DEVMON_DEBUG("监听 软元件 %s:%d \r\n",device_name,g_monitor_config.device_number );
 
-        DEVMON_DEBUG("监视格式= %d 显示=%d 进制数=%d,位顺序=%d,注释=%d",
+        DEVMON_DEBUG("监视格式= %d 显示=%d 进制数=%d,位顺序=%d",
                                     g_monitor_config.form ,
                                     g_monitor_config.display ,
                                     g_monitor_config.value_format ,
-                                    g_monitor_config.bit_order, 
-                                    g_monitor_config.comment );
+                                    g_monitor_config.bit_order);
 #endif
         //统一用 字单位的成批读出,只是在显示的时候不一样..
         if ( device_type == FX_DEVMON_DEV_C  ) 
@@ -351,7 +388,9 @@ void FX_DEVMON_UpdateMonitor_Data_REAL_form(u8 device_type, u8 *buff, u16 len)
                       (buff[buff_index+1] << 8) | buff[buff_index];
         DEVMON_DEBUG("%f\r\n",real_value.f );
         // 将实数转换为整数存储（实际应用中可能需要调整）
-        g_data_rows[i].word_value = (uint32_t)real_value.f;
+        /* 保存浮点的"原始位模式"而不是截断后的整数（原写法把 3.14 显示成 3）。
+         * 页面按 float 解释该 32 位值；字序约定见文件开头说明。 */
+        g_data_rows[i].word_value = real_value.u;
         buff_index += 4;
         
         // 设置软元件编号
@@ -498,12 +537,11 @@ void FX_DEVMON_UpdateMonitor_Data(u8 *buff, u16 len)
     {
         uint8_t device_type = g_monitor_config.device_type;               // 软元件类型
 
-        DEVMON_DEBUG("监视格式= %d 显示=%d 进制数=%d,位顺序=%d,注释=%d \r\n",
+        DEVMON_DEBUG("监视格式= %d 显示=%d 进制数=%d,位顺序=%d \r\n",
                                     g_monitor_config.form,
                                     g_monitor_config.display,
                                     g_monitor_config.value_format,
-                                    g_monitor_config.bit_order,
-                                    g_monitor_config.comment);
+                                    g_monitor_config.bit_order);
 
         // 根据显示格式调用相应的处理函数
         switch (g_monitor_config.display) {
@@ -545,7 +583,10 @@ static uint16_t FX_DEVMON_SendData_Table_Name(char * dev_name , uint16_t index)
     if (g_monitor_config.monitor_type == FX_DEVMON_MONITOR_DEVICE) 
     {
         /* 软元件 名称 */
-        sprintf(dev_name, "%s", FX_DEVMON_GetDeviceTypeString(g_monitor_config.device_type));
+        /* 取类型前缀(D/R/X/Y/M/S/T/C)的长度作为偏移：下面用 dev_name + offset 追加编号。
+         * 原实现丢弃了 sprintf 的返回值(offset 恒为 0)，编号从 dev_name[0] 开始写，
+         * 把刚写好的类型前缀覆盖掉 -> 页面"软元件"列只剩编号(如 4/7)而没有 D4/D7。 */
+        offset = (uint16_t)sprintf(dev_name, "%s", FX_DEVMON_GetDeviceTypeString(g_monitor_config.device_type));
         switch (g_monitor_config.form) 
         {
         case FX_DEVMON_FORM_BIT:
@@ -759,7 +800,6 @@ static void FX_DEVMON_SendDataRows(uint8_t Dest_Sock, int start_row, int end_row
             break;
         }
         /* 注释 */
-        offset += sprintf(temp_buffer + offset, "<td>%s</td>\r\n", g_data_rows[i].comment);
         offset += sprintf(temp_buffer + offset, "</tr>\r\n");
 
         /* 数据量达到阈值时发送 */
@@ -879,8 +919,8 @@ static void FX_DEVMON_SendData_Table(uint8_t Dest_Sock)
             offset += sprintf(buffer + offset, "<td width=\"40\">+%X</td>", (num-i) );
         }
     }
-    // 值和注释列标题
-    offset += sprintf(buffer + offset, "\r\n<td width=\"60\">值</td>\r\n<td width=\"180\">注释</td>\r\n");
+    // 值列标题
+    offset += sprintf(buffer + offset, "\r\n<td width=\"60\">值</td>\r\n");
     // 表头行结束
     offset += sprintf(buffer + offset, "</tr>\r\n");
     // 表头结束
@@ -909,16 +949,35 @@ void FX_DEVMON_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,  char *url)
     uint32_t offset;
 
     /* 更新监视数据 */
-    //FX_DEVMON_UpdateMonitor_CMD(Sour_Sock,Dest_Sock);
+    /* ★ 进入/刷新页面即发起一次 PLC 批量读（原为注释，导致从不采集）。
+     * 响应到达后由 UART 分发(HTTPS.c Web_Usart_Handler)更新行数据并重发本页。 */
+    FX_DEVMON_UpdateMonitor_CMD(Sour_Sock, Dest_Sock);
 
     /* 获取监控状态 */
     monitor_status  = (char*) HTML_GetStateString(net_monitor_state);
     /* 发送HTTP响应头 */
     SendHttpHeader(Dest_Sock, PTYPE_HTML);
     
-    /* 第一次打包: HTML头部和CSS样式 (使用公共组件) */
+    /* 第一次打包: HTML头部（与 CSS 拆开，以在 </head> 之前插入自动更新 meta） */
     offset = 0;
     offset += sprintf(temp_buffer + offset, HTML_GetComponent(HTML_COMP_HEADER), "软元件/缓冲存储器批量监视");
+    Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
+
+    /* 自动更新间隔：秒数取页面配置 INT(5~120)，越界钳到 5 秒。
+     * 必须位于 CSS 组件之前（CSS 组件自带 </style></head>）。
+     * 浏览器按此秒数重新请求本页 → 再次触发上面的批量读 → 形成自适应轮询。 */
+    {
+        uint16_t itv = g_monitor_config.update_interval;
+        if (itv < 5u || itv > 120u) {
+            itv = 5u;
+        }
+        offset = 0;
+        offset += sprintf(temp_buffer + offset, "<meta http-equiv=\"refresh\" content=\"%u\">\r\n", itv);
+        Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
+    }
+
+    /* 第二次打包: CSS 样式表 */
+    offset = 0;
     offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_CSS_NEW));
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 
@@ -953,7 +1012,7 @@ void FX_DEVMON_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,  char *url)
     
     /* 第七次打包: 自动更新间隔 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"6\"></td>\r\n<td colspan=\"2\">自动更新间隔时间(5 - 120)</td>\r\n</tr>\r\n<tr>\r\n<td colspan=\"1\"></td><td colspan=\"1\">监视格式</td><td colspan=\"1\">显示</td>\r\n<td colspan=\"1\">进制数</td><td colspan=\"1\">位顺序</td><td colspan=\"1\">注释</td>\r\n<td colspan=\"2\"><input type=\"text\" size=\"5\" maxlength=\"3\" name=\"INT\" value=\"%d\">(秒)</td>\r\n</tr>\r\n", g_monitor_config.update_interval);
+    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"6\"></td>\r\n<td colspan=\"2\">自动更新间隔时间(5 - 120)</td>\r\n</tr>\r\n<tr>\r\n<td colspan=\"1\"></td><td colspan=\"1\">监视格式</td><td colspan=\"1\">显示</td>\r\n<td colspan=\"1\">进制数</td><td colspan=\"2\">位顺序</td>\r\n<td colspan=\"2\"><input type=\"text\" size=\"5\" maxlength=\"3\" name=\"INT\" value=\"%d\">(秒)</td>\r\n</tr>\r\n", g_monitor_config.update_interval);
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     
     /* 第八次打包: 配置选项行1 */
@@ -962,7 +1021,7 @@ void FX_DEVMON_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,  char *url)
     offset += sprintf(temp_buffer + offset, "<td colspan=\"1\"><input type=\"radio\" name=\"DISP\" value=\"16\" %s>16位整数</td>\r\n", g_monitor_config.display == FX_DEVMON_DISP_16BIT ? "checked" : "");
     offset += sprintf(temp_buffer + offset, "<td colspan=\"1\"><input type=\"radio\" name=\"VAL\" value=\"D\" %s>10进制</td>\r\n", g_monitor_config.value_format == FX_DEVMON_VAL_DECIMAL ? "checked" : "");
     offset += sprintf(temp_buffer + offset, "<td colspan=\"1\"><input type=\"radio\" name=\"BITO\" value=\"0\" %s>0-F</td>\r\n", g_monitor_config.bit_order == FX_DEVMON_BIT_ORDER_0F ? "checked" : "");
-    offset += sprintf(temp_buffer + offset, "<td colspan=\"2\"><input type=\"radio\" name=\"CMT\" value=\"N\" %s>不显示</td>\r\n</tr>\r\n", g_monitor_config.comment == FX_DEVMON_COMMENT_NONE ? "checked" : "");
+    offset += sprintf(temp_buffer + offset, "<td colspan=\"2\"></td>\r\n</tr>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     
     /* 第九次打包: 配置选项行2 */
@@ -971,7 +1030,7 @@ void FX_DEVMON_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,  char *url)
     offset += sprintf(temp_buffer + offset, "<td colspan=\"1\"><input type=\"radio\" name=\"DISP\" value=\"32\" %s>32位整数</td>\r\n", g_monitor_config.display == FX_DEVMON_DISP_32BIT ? "checked" : "");
     offset += sprintf(temp_buffer + offset, "<td colspan=\"1\"><input type=\"radio\" name=\"VAL\" value=\"H\" %s>16进制</td>\r\n", g_monitor_config.value_format == FX_DEVMON_VAL_HEX ? "checked" : "");
     offset += sprintf(temp_buffer + offset, "<td colspan=\"1\"><input type=\"radio\" name=\"BITO\" value=\"F\" %s>F-0</td>\r\n", g_monitor_config.bit_order == FX_DEVMON_BIT_ORDER_F0 ? "checked" : "");
-    offset += sprintf(temp_buffer + offset, "<td colspan=\"2\"><input type=\"radio\" name=\"CMT\" value=\"D\" %s>显示</td>\r\n</tr>\r\n", g_monitor_config.comment == FX_DEVMON_COMMENT_SHOW ? "checked" : "");
+    offset += sprintf(temp_buffer + offset, "<td colspan=\"2\"></td>\r\n</tr>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     
     /* 第八次打包: 配置选项行3和4 */
@@ -1009,9 +1068,7 @@ void FX_DEVMON_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,  char *url)
 
     /* 第十七次打包: 数据表格 - 数据行31-32 + 结束标签和页脚 (使用公共组件) */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "</tbody>\r\n");
-    offset += sprintf(temp_buffer + offset, "</table>\r\n");
-    offset += sprintf(temp_buffer + offset, "</div>\r\n");
+    offset += sprintf(temp_buffer + offset, "</tbody>\r\n</table>\r\n</div>\r\n</div>\r\n</form>\r\n</body>\r\n</html>\r\n");
     offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_FOOTER_NEW));
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
       
@@ -1148,20 +1205,14 @@ void FX_DEVMON_METHOD_POST(uint8_t Sour_Sock ,uint8_t  Dest_Sock,  char *http_re
                 else if (strcmp(decoded_value, "F") == 0) g_monitor_config.bit_order = FX_DEVMON_BIT_ORDER_F0;
                 DEVMON_DEBUG("大小端模式：%d \r\n",g_monitor_config.bit_order);
             }
-            else if (strcmp(key, "CMT") == 0)
-            {
-                if (strcmp(decoded_value, "N") == 0) g_monitor_config.comment = FX_DEVMON_COMMENT_NONE;
-                else if (strcmp(decoded_value, "D") == 0) g_monitor_config.comment = FX_DEVMON_COMMENT_SHOW;
-                DEVMON_DEBUG("注释显示：%d \r\n",g_monitor_config.comment);
-            }
             else if (strcmp(key, "CMD") == 0)
             {
                 //CMD=%BC%E0%CA%D3%BF%AA%CA%BC
-                if (strcmp(decoded_value, "%%BC%%E0%%CA%D3%%BF%%AA%%CA%%BC") == 0) {
+                if (strcmp(decoded_value, "\xBC\xE0\xCA\xD3\xBF\xAA\xCA\xBC") == 0) {
                     FX_ENETINF_SetMonitorState(FX_MONITOR_RUNNING);      //监视开始
                     DEVMON_DEBUG("监视开始按钮 \r\n");
                 }
-                else if(strcmp(decoded_value, "%%BC%%E0%%CA%%D3%%CD%%A3%%D6%%B9") == 0)  {
+                else if(strcmp(decoded_value, "\xBC\xE0\xCA\xD3\xCD\xA3\xD6\xB9") == 0)  {
                     FX_ENETINF_SetMonitorState(FX_MONITOR_STOPPED);      //监视停止
                     DEVMON_DEBUG("监视停止按钮 \r\n");
                 }
@@ -1172,7 +1223,7 @@ void FX_DEVMON_METHOD_POST(uint8_t Sour_Sock ,uint8_t  Dest_Sock,  char *http_re
                 //PAGE_B=%CF%C2%D2%BB%D2%B3 下一页
                 //PAGE_B=%C9%CF%D2%BB%B8%F6 上一个
                 //PAGE_B=%CF%C2%D2%BB%B8%F6 下一个
-                if (strcmp(decoded_value, "%%C9%%CF%%D2%%BB%%D2%%B3") == 0) {
+                if (strcmp(decoded_value, "\xC9\xCF\xD2\xBB\xD2\xB3") == 0) {
                     //上一页
                     if(g_monitor_config.monitor_type == FX_DEVMON_MONITOR_DEVICE ){
                         //软元件
@@ -1183,7 +1234,7 @@ void FX_DEVMON_METHOD_POST(uint8_t Sour_Sock ,uint8_t  Dest_Sock,  char *http_re
                     }
                     DEVMON_DEBUG("上一页按钮 \r\n");
                 }
-                else if(strcmp(decoded_value, "%%CF%%C2%%D2%%BB%%D2%%B3") == 0)  {
+                else if(strcmp(decoded_value, "\xCF\xC2\xD2\xBB\xD2\xB3") == 0)  {
                     //下一页
                     if(g_monitor_config.monitor_type == FX_DEVMON_MONITOR_DEVICE ){
                         //软元件
@@ -1194,7 +1245,7 @@ void FX_DEVMON_METHOD_POST(uint8_t Sour_Sock ,uint8_t  Dest_Sock,  char *http_re
                     }
                     DEVMON_DEBUG("下一页按钮 \r\n");
                 }
-                if (strcmp(decoded_value, "%%C9%%CF%%D2%%BB%%B8%%F6") == 0) {
+                if (strcmp(decoded_value, "\xC9\xCF\xD2\xBB\xB8\xF6") == 0) {
                     //上一个
                     if(g_monitor_config.monitor_type == FX_DEVMON_MONITOR_DEVICE ){
                         //软元件
@@ -1205,7 +1256,7 @@ void FX_DEVMON_METHOD_POST(uint8_t Sour_Sock ,uint8_t  Dest_Sock,  char *http_re
                     }
                     DEVMON_DEBUG("上一个按钮 \r\n");
                 }
-                else if(strcmp(decoded_value, "%%CF%%C2%%D2%%BB%%B8%%F6") == 0)  {
+                else if(strcmp(decoded_value, "\xCF\xC2\xD2\xBB\xB8\xF6") == 0)  {
                     //下一个
                     if(g_monitor_config.monitor_type == FX_DEVMON_MONITOR_DEVICE ){
                         //软元件

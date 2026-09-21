@@ -26,6 +26,8 @@
 #include "fx_enetinf.h"
 #include "fx_acclog.h"
 #include "fx_devmon.h"
+#include "ethernet_app.h"      /* FX_ENETINF_SetMonitorState / FX_MONITOR_RUNNING */
+#include "melsec_fx_core.h"    /* hex_str_to_intlend：把 PLC 回帧的 ASCII 十六进制数据解码为二进制 */
 
 
 st_http_request http_request;
@@ -581,6 +583,68 @@ uint8_t URLDecode(char *srcptr, char *desptr, uint8_t bufflen)
     return datalen;
 }
 
+/* URL 解码(%XX -> 字节)，返回解码后字节数(含结尾 0)。不复用上面的 URLDecode():
+ * 它有 Login_CfgBuf.pass 长度上限，这里需要按 CMD= 定长截取。 */
+static uint8_t HTTPS_DecodeUrlBytes(const char *src, char *dst, uint8_t dst_len)
+{
+    uint8_t n = 0;
+
+    if (src == NULL || dst == NULL || dst_len == 0u) {
+        return 0;
+    }
+    while (*src != 0 && n < (uint8_t)(dst_len - 1u)) {
+        if (src[0] == 0x25 && src[1] != 0 && src[2] != 0) {
+            char hex[3];
+            hex[0] = src[1];
+            hex[1] = src[2];
+            hex[2] = 0;
+            dst[n++] = (char)strtol(hex, NULL, 16);
+            src += 3;
+        } else {
+            dst[n++] = *src++;
+        }
+    }
+    dst[n] = 0;
+    return n;
+}
+
+/* 解析 POST 请求里的 CMD 参数(监视开始/监视停止)，命中即切换监视运行状态。
+ * 这两个按钮在 通信状态页(fx_status) 与 FX3U-ENET-ADP信息页(fx_enetinf) 上都有，
+ * 但这两个 POST 分支此前只重绘页面、不解析 CMD(全工程只有 fx_devmon 页解析)，
+ * 所以按钮点了没反应。POST 值是 GBK 的 URL 编码(监视开始=%BC%E0%CA%D3%BF%AA%CA%BC)，
+ * 解码后与十六进制转义的 GBK 字节比较，不受源文件编码影响。 */
+static void HTTPS_HandleMonitorCmd(const char *request)
+{
+    char enc[32];
+    char dec[32];
+    const char *p;
+    uint8_t i = 0;
+
+    if (request == NULL) {
+        return;
+    }
+    p = strstr(request, "CMD=");
+    if (p == NULL) {
+        return;
+    }
+    p += 4;
+    while (p[i] != 0 && p[i] != 0x26 && i < (uint8_t)(sizeof(enc) - 1u)) {
+        enc[i] = p[i];
+        i++;
+    }
+    enc[i] = 0;
+
+    if (HTTPS_DecodeUrlBytes(enc, dec, (uint8_t)sizeof(dec)) == 0u) {
+        return;
+    }
+
+    if (strcmp(dec, "\xBC\xE0\xCA\xD3\xBF\xAA\xCA\xBC") == 0) {           /* 监视开始 */
+        FX_ENETINF_SetMonitorState(FX_MONITOR_RUNNING);
+    } else if (strcmp(dec, "\xBC\xE0\xCA\xD3\xCD\xA3\xD6\xB9") == 0) {    /* 监视停止 */
+        FX_ENETINF_SetMonitorState(FX_MONITOR_STOPPED);
+    }
+}
+
 /*********************************************************************
  * @fn      Refresh_Login
  *
@@ -1038,7 +1102,7 @@ char* find_parameter_value(const char* body, const char* param_name) {
 //         "Host: 192.168.1.250\r\n"
 //         "Content-Length: 123\r\n"
 //         "\r\n"
-//         "MONT=D&DEVT=D&DEVN=0&CMD=%BC%E0%CA%D3%BF%AA%CA%BC&MDL=0&BFMN=0&BFMV=10%BD%F8%D6%C6&INT=5&DISP=16&VAL=D&FORM=WD&BITO=F&CMT=D";
+//         "MONT=D&DEVT=D&DEVN=0&CMD=%BC%E0%CA%D3%BF%AA%CA%BC&MDL=0&BFMN=0&BFMV=10%BD%F8%D6%C6&INT=5&DISP=16&VAL=D&FORM=WD&BITO=F";
     
 //     HTTPS_DEBUG("=== 从原始数据包提取请求体 ===\n");
 //     char* body = extract_body_from_raw_data(raw_packet, sizeof(raw_packet));
@@ -1341,6 +1405,7 @@ void Web_Server(uint8_t Sour_Sock ,uint8_t  Dest_Sock, uint8_t *socket_buffer,ui
 
                 /* 三菱FX3U-ENET-ADP HTTP页面 - POST请求处理 */
                 if(strstr(name, "fx_status.html") != NULL || strstr(name, "fx_status") != NULL) {
+                    HTTPS_HandleMonitorCmd((char*)socket_buffer);
                     FX_STATUS_SendWebPage(Sour_Sock,Dest_Sock, (char*)name);
                     current_page = HTML_PAGE_STATUS ;  /* 标记页面已处理 */
                 }
@@ -1349,6 +1414,7 @@ void Web_Server(uint8_t Sour_Sock ,uint8_t  Dest_Sock, uint8_t *socket_buffer,ui
                     current_page = HTML_PAGE_PLCINF;  /* 标记页面已处理 */
                 }
                 else if(strstr(name, "fx_enetinf.html") != NULL || strstr(name, "fx_enetinf") != NULL) {
+                    HTTPS_HandleMonitorCmd((char*)socket_buffer);
                     FX_ENETINF_SendWebPage(Sour_Sock,Dest_Sock, (char*)name);
                     current_page = HTML_PAGE_ENETINF;  /* 标记页面已处理 */
                 }
@@ -1357,7 +1423,7 @@ void Web_Server(uint8_t Sour_Sock ,uint8_t  Dest_Sock, uint8_t *socket_buffer,ui
                     current_page = HTML_PAGE_ACCLOG;  /* 标记页面已处理 */
                 }
                 else if(strstr(name, "fx_devmon.html") != NULL || strstr(name, "fx_devmon") != NULL) {
-                    //MONT=D&DEVT=D&DEVN=0&CMD=%BC%E0%CA%D3%BF%AA%CA%BC&MDL=0&BFMN=0&BFMV=10%BD%F8%D6%C6&INT=5&DISP=16&VAL=D&FORM=WD&BITO=F&CMT=D
+                    //MONT=D&DEVT=D&DEVN=0&CMD=%BC%E0%CA%D3%BF%AA%CA%BC&MDL=0&BFMN=0&BFMV=10%BD%F8%D6%C6&INT=5&DISP=16&VAL=D&FORM=WD&BITO=F
                     FX_DEVMON_METHOD_POST(Sour_Sock,Dest_Sock, (char*)socket_buffer);
            
                     current_page = HTML_PAGE_DEVMON;  /* 标记页面已处理 */
@@ -1495,8 +1561,33 @@ void Web_Usart_Handler(uint8_t Sour_Sock ,uint8_t  Dest_Sock, uint8_t *buffer,ui
             break;
         case HTML_PAGE_DEVMON :
             HTTPS_DEBUG("fx_devmon.html \r\n");
-            FX_DEVMON_UpdateMonitor_Data(buffer, lend); // 更新监控数据
+            /* ★ 关键修复：buffer 是"原始 UART 回帧"(STX + ASCII 十六进制数据 + 校验和 + ETX)，
+             * 而 FX_DEVMON_UpdateMonitor_Data 内部按"二进制小端字"解析
+             * (fx_devmon.c 的 ..._16BIT_form/32BIT_form/REAL_form/ASCII_form)。
+             * 原实现把原始帧直接传进去，数据被当二进制误解，表格永远全 0/空。
+             * 这里照 sim_Process_local_machine()(ethernet_app.c:1463) 的既有范式先解码：
+             *   跳过 STX(buffer+1)，ASCII→二进制，字节数 = (帧长-4)/2。
+             * 解码缓冲复用 HtmlBuffer（紧随其后的 SendWebPage 会重新填充，二者不冲突）。 */
+            if (lend > 4u) {
+                uint16_t dlen = (uint16_t)((lend - 4u) / 2u);
+                dlen &= 0xFFFEu;                              /* 该转换要求长度为偶数 */
+                if (dlen > (uint16_t)(HTML_LEN - 2u)) {
+                    dlen = (uint16_t)(HTML_LEN - 2u);         /* 防超长帧越界 */
+                }
+                if (dlen >= 2u) {
+                    hex_str_to_intlend(buffer + 1, dlen, (uint8_t*)HtmlBuffer);
+                    FX_DEVMON_UpdateMonitor_Data((u8*)HtmlBuffer, dlen); // 更新监控数据
+                }
+            }
             // 显示网页:发送网页数据.
+            if (SX_Active(Dest_Sock)) {
+                /* 该 socket 正在流式发送本页(浏览器请求触发的这一遍)，
+                 * 此时再发一遍会 SendHttpHeader -> SX_Begin -> SX_Abort 掉在途的流，
+                 * 页面就会在表格中部被截断(表现为表格底线与页脚不显示)。
+                 * 数据已在上面更新，本轮不再重发，等浏览器按刷新间隔再次请求。 */
+                HTTPS_DEBUG("devmon page streaming, skip resend\r\n");
+                break;
+            }
             FX_DEVMON_SendWebPage(Sour_Sock,Dest_Sock, (char*)buffer);
             break;
         default:

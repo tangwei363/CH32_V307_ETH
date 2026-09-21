@@ -36,8 +36,24 @@ static void FX_ACCLOG_SendAccessTable(uint8_t Dest_Sock);
 void FX_ACCLOG_Init(void )
 {
     extern Log_data  log_data;                          // 日志记录数据
+    uint8_t qsize;                                      // 钳位后的队列容量
     /* 初始化队列结构体 */
-    FIFO_Init(&g_access_fifo, g_access_logs, sizeof(fx_acclog_record_t), log_data.access_log_target_cnt);
+    /* ★ 容量钳位（关键，勿删）：PLC 侧"记录件数"合法范围是 1~16
+     * （见 ethernet_app.h:109 / ethernet_app.c:577 的校验），而 g_access_logs[]
+     * 只有 FX_ACCLOG_MAX_RECORDS(8) 个元素：
+     *   - 直接传 16 → FIFO_Init 的 memset 写 352B 进 176B 数组 → 越界写穿 BSS，
+     *     运行期 head % size 还会索引到 g_access_logs[8..15]；
+     *   - 传 0（PLC 未设置/读取失败）→ head % 0 = 0xFFFFFFFF，截断为 0xFF
+     *     → offset = 0xFF * item_size → 野地址 memcpy，首次连接即触发。
+     * 故统一钳到 [1, FX_ACCLOG_MAX_RECORDS]。 */
+    qsize = log_data.access_log_target_cnt;
+    if (qsize == 0u || qsize > FX_ACCLOG_MAX_RECORDS) {
+        qsize = FX_ACCLOG_MAX_RECORDS;
+    }
+
+    FIFO_Init(&g_access_fifo, g_access_logs, sizeof(fx_acclog_record_t), qsize);
+
+    FX_ACCLOG_DEBUG("访问履历队列: 容量=%d (PLC设定=%d)\r\n", qsize, log_data.access_log_target_cnt);
 
     FX_ACCLOG_DEBUG("访问履历模块初始化完成\r\n");
 }
@@ -255,31 +271,57 @@ void WCHNET_UpdateAccLog(void)
  *
  * @return  无
  */
+/* ── 记录字段 → 显示文本（必须"值域映射"，绝不能用原始编码当数组下标）──
+ * 记录里存的是原始编码：
+ *   protocol  = ETH_TYPE_TCP(0x01) / ETH_TYPE_UDP(0x02)      (见 bsp_wch_net.c 入队处)
+ *   open_type = Pro_Type：0xA0 MELSOFT / 0xA6 TCP-MC / 0xA7 UDP-MC / 0xA8 数据监视
+ * 原实现用它们直接索引 2~4 元素的小数组：open_str[0xA0] 越界 640 字节，
+ * 读到栈上的野指针，再交给 sprintf("%s") 解引用非法地址，导致硬件异常/看门狗复位
+ * （现象：一进访问履历页面就死机重启）。此处改为逐值映射并带默认兜底。 */
+static const char* FX_ACCLOG_ProtoStr(uint16_t protocol)
+{
+    switch (protocol) {
+        case (uint16_t)ETH_TYPE_TCP: return "TCP";
+        case (uint16_t)ETH_TYPE_UDP: return "UDP";
+        default:                     return "----";
+    }
+}
+
+static const char* FX_ACCLOG_OpenStr(uint16_t open_type)
+{
+    switch (open_type) {
+        case (uint16_t)PRO_TCPC_MELSOFT: return "MELSOFT连接";
+        case (uint16_t)PRO_TCPC_MC:      return "MC协议";
+        case (uint16_t)PRO_UDPC_MC:      return "MC协议";
+        case (uint16_t)PRO_TCP_HTTP:     return "数据监视";
+        default:                         return "----";
+    }
+}
+
 static void FX_ACCLOG_SendAccessTable(uint8_t Dest_Sock)
 {
     char *temp_buffer = HtmlBuffer;
     uint32_t offset;
     uint8_t i;
-    const char* proto_str[] = {"TCP", "UDP"};
-    const char* open_str[] = {"MELSOFT连接", "MC协议", "数据监视", "未知"};
     uint8_t row_count = 0;  /* 用于计数每4-5行发送一次 */
+    uint8_t rows;                   /* 表格行数（含未设置时的回退值） */
+
+    /* 行数来源：PLC 设定的访问履历点数(FIFO 容量)。若为 0（未设置）则回退 16 行，
+     * 否则整表只剩表头、看起来像页面故障（原厂页面固定显示整表）。 */
+    rows = FIFO_GetSize(&g_access_fifo);
+    if (rows == 0u) { rows = 16u; }
 
     /* 第一次打包: 表格容器开始 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<div class=\"table-wrapper\">\r\n");
-    offset += sprintf(temp_buffer + offset, "<table class=\"access-table\">\r\n");
-    offset += sprintf(temp_buffer + offset, "<thead>\r\n");
-    offset += sprintf(temp_buffer + offset, "<tr>\r\n");
-    offset += sprintf(temp_buffer + offset, "<th>No.</th>\r\n");
-    offset += sprintf(temp_buffer + offset, "<th>年月日</th>\r\n");
-    offset += sprintf(temp_buffer + offset, "<th>时间</th>\r\n");
-    offset += sprintf(temp_buffer + offset, "<th>连接号</th>\r\n");
-    offset += sprintf(temp_buffer + offset, "<th>协议</th>\r\n");
-    offset += sprintf(temp_buffer + offset, "<th>开放方式</th>\r\n");
-    offset += sprintf(temp_buffer + offset, "<th>通信对象IP地址</th>\r\n");
+    offset += sprintf(temp_buffer + offset, "<table border=\"1\" cellspacing=\"1\" style=\"margin:0 auto;\">\r\n<tbody>\r\n<tr>\r\n<td>\r\n<table border=\"1\" cellspacing=\"0\" bgcolor=\"#ffffff\" style=\"table-layout:fixed;text-align:center;font-size:14px\">\r\n<tbody>\r\n<tr bgcolor=\"#cccccc\">\r\n");
+    offset += sprintf(temp_buffer + offset, "<td width=\"60\">No.</td>\r\n");
+    offset += sprintf(temp_buffer + offset, "<td width=\"130\">年月日</td>\r\n");
+    offset += sprintf(temp_buffer + offset, "<td width=\"80\">时间</td>\r\n");
+    offset += sprintf(temp_buffer + offset, "<td width=\"190\">连接号</td>\r\n");
+    offset += sprintf(temp_buffer + offset, "<td width=\"80\">协议</td>\r\n");
+    offset += sprintf(temp_buffer + offset, "<td width=\"160\">开放方式</td>\r\n");
+    offset += sprintf(temp_buffer + offset, "<td width=\"110\">通信对象<br>IP地址</td>\r\n");
     offset += sprintf(temp_buffer + offset, "</tr>\r\n");
-    offset += sprintf(temp_buffer + offset, "</thead>\r\n");
-    offset += sprintf(temp_buffer + offset, "<tbody>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 
     /* 生成并发送访问履历行，每4-5行打包一次 */
@@ -294,8 +336,8 @@ static void FX_ACCLOG_SendAccessTable(uint8_t Dest_Sock)
         fx_acclog_record_t latest_record;
         if (FX_ACCLOG_GetNextRecord(&latest_record)) {
             offset += sprintf(temp_buffer + offset,
-                    "<tr class=\"row-new\">\r\n"
-                    "<td>最新</td>\r\n"
+                    "<tr>\r\n"
+                    "<td class=\"ct\">最新</td>\r\n"
                     "<td>%04d-%02d-%02d</td>\r\n"
                     "<td>%02d:%02d:%02d</td>\r\n"
                     "<td>%d</td>\r\n"
@@ -310,8 +352,8 @@ static void FX_ACCLOG_SendAccessTable(uint8_t Dest_Sock)
                     latest_record.log_time.minute, 
                     latest_record.log_time.second,
                     latest_record.conn_id,
-                    proto_str[latest_record.protocol],
-                    open_str[latest_record.open_type],
+                    FX_ACCLOG_ProtoStr(latest_record.protocol),
+                    FX_ACCLOG_OpenStr(latest_record.open_type),
                     latest_record.remote_ip[0], 
                     latest_record.remote_ip[1],
                     latest_record.remote_ip[2], 
@@ -322,10 +364,10 @@ static void FX_ACCLOG_SendAccessTable(uint8_t Dest_Sock)
         /* 显示剩余记录 */
         fx_acclog_record_t record;
         uint8_t record_index = 1;
-        while (FX_ACCLOG_GetNextRecord(&record) && record_index < FIFO_GetSize(&g_access_fifo)) {
+        while (FX_ACCLOG_GetNextRecord(&record) && record_index < rows) {
             offset += sprintf(temp_buffer + offset,
                     "<tr>\r\n"
-                    "<td>%d</td>\r\n"
+                    "<td class=\"ct\">%d</td>\r\n"
                     "<td>%04d-%02d-%02d</td>\r\n"
                     "<td>%02d:%02d:%02d</td>\r\n"
                     "<td>%d</td>\r\n"
@@ -337,8 +379,8 @@ static void FX_ACCLOG_SendAccessTable(uint8_t Dest_Sock)
                     record.log_time.year, record.log_time.month, record.log_time.day,
                     record.log_time.hour, record.log_time.minute, record.log_time.second,
                     record.conn_id,
-                    proto_str[record.protocol],
-                    open_str[record.open_type],
+                    FX_ACCLOG_ProtoStr(record.protocol),
+                    FX_ACCLOG_OpenStr(record.open_type),
                     record.remote_ip[0], record.remote_ip[1],
                     record.remote_ip[2], record.remote_ip[3]);
             row_count++;
@@ -353,16 +395,16 @@ static void FX_ACCLOG_SendAccessTable(uint8_t Dest_Sock)
         }
         
         /* 显示空行 */
-        for (; record_index < FIFO_GetSize(&g_access_fifo); record_index++) {
+        for (; record_index < rows; record_index++) {
             offset += sprintf(temp_buffer + offset,
-                    "<tr class=\"row-header\">\r\n"
-                    "<td>%d</td>\r\n"
-                    "<td></td>\r\n"
-                    "<td></td>\r\n"
-                    "<td></td>\r\n"
-                    "<td></td>\r\n"
-                    "<td></td>\r\n"
-                    "<td></td>\r\n"
+                    "<tr>\r\n"
+                    "<td class=\"ct\">%d</td>\r\n"
+                    "<td>&nbsp;</td>\r\n"
+                    "<td>&nbsp;</td>\r\n"
+                    "<td>&nbsp;</td>\r\n"
+                    "<td>&nbsp;</td>\r\n"
+                    "<td>&nbsp;</td>\r\n"
+                    "<td>&nbsp;</td>\r\n"
                     "</tr>\r\n",
                     record_index);
             row_count++;
@@ -376,16 +418,16 @@ static void FX_ACCLOG_SendAccessTable(uint8_t Dest_Sock)
         }
     } else {
         /* 所有行都是空行 */
-        for (i = 0; i < FIFO_GetSize(&g_access_fifo); i++) {
+        for (i = 0; i < rows; i++) {
             offset += sprintf(temp_buffer + offset,
-                    "<tr class=\"row-header\">\r\n"
-                    "<td>%d</td>\r\n"
-                    "<td></td>\r\n"
-                    "<td></td>\r\n"
-                    "<td></td>\r\n"
-                    "<td></td>\r\n"
-                    "<td></td>\r\n"
-                    "<td></td>\r\n"
+                    "<tr>\r\n"
+                    "<td class=\"ct\">%d</td>\r\n"
+                    "<td>&nbsp;</td>\r\n"
+                    "<td>&nbsp;</td>\r\n"
+                    "<td>&nbsp;</td>\r\n"
+                    "<td>&nbsp;</td>\r\n"
+                    "<td>&nbsp;</td>\r\n"
+                    "<td>&nbsp;</td>\r\n"
                     "</tr>\r\n",
                     i);
             row_count++;
@@ -406,9 +448,7 @@ static void FX_ACCLOG_SendAccessTable(uint8_t Dest_Sock)
 
     /* 表格尾部 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "</tbody>\r\n");
-    offset += sprintf(temp_buffer + offset, "</table>\r\n");
-    offset += sprintf(temp_buffer + offset, "</div>\r\n");
+    offset += sprintf(temp_buffer + offset, "</tbody>\r\n</table>\r\n</td>\r\n</tr>\r\n</tbody>\r\n</table>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 }
 
@@ -436,9 +476,8 @@ void FX_ACCLOG_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,char *url)
     /* 第一次打包: HTML头部到</head> (使用共享组件) */
     offset = 0;
     offset += sprintf(temp_buffer + offset, HTML_GetComponent(HTML_COMP_HEADER), "访问履历");
-    offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_CSS_NEW));
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
-    /* 第二次打包: body开始到导航栏结束 (使用共享组件) */
+    /* CSS 样式表直发：组件 >1.2KB，HtmlBuffer 装不下(越界会写穿 BSS 导致死机) */
     offset = 0;
     offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_BODY_START_NEW));
     offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_NAV_BAR_NEW));
@@ -446,16 +485,17 @@ void FX_ACCLOG_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,char *url)
     
     /* 第五次打包: 内容区域开始、页面标题和表单开始 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<div class=\"content\" style=\"margin:0 auto;max-width:1200px;\">\r\n");
-    offset += sprintf(temp_buffer + offset, "<div class=\"page-title\">访问履历</div>\r\n");
-    offset += sprintf(temp_buffer + offset, "<form action=\"fx_acclog.html\" method=\"post\" style=\"margin:0\">\r\n");
+    offset += sprintf(temp_buffer + offset, "<div class=\"content\">\r\n<br>\r\n");
+    offset += sprintf(temp_buffer + offset, "<div style=\"text-align:center\"><font style=\"font-size=16px\"><b>访问履历</b></font></div>\r\n");
+    offset += sprintf(temp_buffer + offset, "<form action=\"fx_acclog.html\" method=\"post\">\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     /* 第六次打包: 控制面板 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<div class=\"control-panel\">\r\n");
-    offset += sprintf(temp_buffer + offset, "<div style=\"display:flex;align-items:center;gap:10px;flex-grow:1\"><span class=\"status-label\">状态:</span><span class=\"status-value\">%s</span></div>\r\n", monitor_status);
-    offset += sprintf(temp_buffer + offset, "<div style=\"display:flex;gap:10px\"><input type=\"submit\" name=\"CMD\" value=\"监视开始\" class=\"btn btn-start\"><input type=\"submit\" name=\"CMD\" value=\"监视停止\" class=\"btn btn-stop\"></div>\r\n");
-    offset += sprintf(temp_buffer + offset, "</div>\r\n");
+    offset += sprintf(temp_buffer + offset, "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" style=\"table-layout:fixed; font-size:14px; margin:0 auto;\">\r\n<tbody>\r\n<tr><td width=\"100\"></td><td width=\"100\"></td><td width=\"100\"></td><td width=\"100\"></td><td width=\"100\"></td><td width=\"100\"></td><td width=\"80\"></td><td width=\"80\"></td></tr>\r\n");
+    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"5\"></td><td colspan=\"1\" align=\"right\">状态 :&nbsp;</td><td colspan=\"2\">%s</td></tr>\r\n", monitor_status);
+    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"6\"></td><td colspan=\"2\"><input type=\"submit\" name=\"CMD\" value=\"监视开始\" style=\"width:120;font-weight:bold\"></td></tr>\r\n");
+    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"6\"></td><td colspan=\"2\"><input type=\"submit\" name=\"CMD\" value=\"监视停止\" style=\"width:120;font-weight:bold\"></td></tr>\r\n");
+    offset += sprintf(temp_buffer + offset, "</tbody>\r\n</table>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     /* 第七次打包: 表单结束 */
     offset = 0;

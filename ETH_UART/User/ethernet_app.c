@@ -81,7 +81,18 @@ const uint8_t MC_cmd_header [10] = {
  */
 void FX_ENETINF_SetMonitorState(net_monitor_state_t state)
 {
+    uint8_t i;
+
     net_monitor_state = state;
+
+    /* 监视开始时清除各套接字的错误码 → 通信状态页 / FX3U-ENET-ADP信息页的 ERR. LED 复位。
+     * ERR. LED 是锁存型(与真实模块一致)：出现过一次通信错误后会一直亮，
+     * 点一次“监视开始”即可消除。 */
+    if (state == FX_MONITOR_RUNNING) {
+        for (i = 0; i < ETH_MAX_CONNECTIONS; i++) {
+            eth_socket[i].Error_Code = 0;
+        }
+    }
     printf("监视状态设置为: %d\r\n", state);
 }
 

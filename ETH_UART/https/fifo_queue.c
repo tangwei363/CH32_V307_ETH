@@ -55,7 +55,8 @@ void FIFO_Init(fifo_queue_t *queue, void *records, uint8_t item_size, uint8_t si
  */
 void FIFO_AddRecord(fifo_queue_t *queue, void *record)
 {
-    if (queue == NULL || record == NULL || queue->records == NULL) {
+    /* queue->size == 0 必须拒绝：后续 head % size 会除零，据此算出的偏移是野指针 */
+    if (queue == NULL || record == NULL || queue->records == NULL || queue->size == 0) {
         return;
     }
     
@@ -94,6 +95,10 @@ uint8_t FIFO_GetNextRecord(fifo_queue_t *queue, void *record)
     if (queue == NULL || record == NULL || queue->records == NULL || queue->count == 0) {
         return 0;
     }
+    /* read_pos >= size 为"已读完"哨兵（合法下标只有 0..size-1） */
+    if (queue->read_pos >= queue->size) {
+        return 0;
+    }
     
     /* 计算当前读取位置的偏移量 */
     uint16_t offset = (uint16_t)queue->read_pos * queue->item_size;
@@ -101,14 +106,16 @@ uint8_t FIFO_GetNextRecord(fifo_queue_t *queue, void *record)
     /* 复制当前读取位置的记录 */
     memcpy(record, (uint8_t *)queue->records + offset, queue->item_size);
     
-    /* 更新读取位置到下一条记录（向尾部方向移动） */
+    /* 更新读取位置到下一条记录（向尾部方向移动）
+     * 原实现到达最旧记录后仍 return 1 且不推进 read_pos，调用方会反复拿到
+     * 同一条旧记录、且永远等不到"读完"（表格被重复行填满 / while 无法退出）。
+     * 这里读完即置哨兵 read_pos = size，下一次调用返回 0 表示结束。 */
     if (queue->read_pos == queue->tail) {
-        // 已经到达最旧的记录
-        return 1;
+        queue->read_pos = queue->size;      /* 哨兵：本队列已读完 */
     } else {
         queue->read_pos = (queue->read_pos - 1 + queue->size) % queue->size;
-        return 1;
     }
+    return 1;
 }
 
 /*********************************************************************
@@ -122,7 +129,15 @@ uint8_t FIFO_GetNextRecord(fifo_queue_t *queue, void *record)
  */
 void FIFO_ResetReadPos(fifo_queue_t *queue)
 {
-    if (queue == NULL && queue->count > 0) {
+    /* 原写法 "queue == NULL && count > 0" 有两处错误：
+     *   ① 队列非空时第一个条件为假 → 读取位置永不重置，页面与回写每次都从
+     *      上次读完的位置继续，拿到的不是"最新"记录；
+     *   ② 传入 NULL 时会继续求值 queue->count → 空指针解引用。
+     * 正确语义：NULL 立即返回；非空则把读取位置重置到最新一条。 */
+    if (queue == NULL) {
+        return;
+    }
+    if (queue->count > 0 && queue->size > 0) {
         queue->read_pos = (queue->head - 1 + queue->size) % queue->size;
     }
 }
