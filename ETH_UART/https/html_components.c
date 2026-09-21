@@ -19,7 +19,7 @@ static const char HTML_Component_Header[] =
     "<!DOCTYPE html>\r\n"
     "<html>\r\n"
     "<head>\r\n"
-    "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\">\r\n"
+    "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=GBK\">\r\n"
     "<title>%s</title>\r\n"
     "<meta http-equiv=\"pragma\" content=\"no-cache\">\r\n"
     "<meta http-equiv=\"cache-control\" content=\"no-cache\">\r\n"
@@ -32,7 +32,7 @@ static const char HTML_Component_Refresh[] =
 /* 新版CSS样式 (index.c使用) - 仅保留居中和自适应功能 */
 static const char HTML_Component_CSS_New[] =
     "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\r\n"
-    "<style>*{margin:0;padding:0;box-sizing:border-box}body{padding:10px;font-family:Arial,sans-serif}.c{max-width:1200px;margin:0 auto}.l{padding:8px 15px;margin-bottom:10px;text-align:right}.l a{text-decoration:none;padding:5px 10px;margin:0 2px}.l a:hover{font-weight:bold}.n{padding:10px;margin-bottom:15px;text-align:center}.n a{text-decoration:none;padding:6px 12px;margin:3px;display:inline-block}.n a:hover{font-weight:bold}.x{padding:30px 20px;text-align:center;margin-bottom:10px}.c1{font-size:20px;font-style:italic;margin:15px 0}.p{font-size:32px;font-style:italic;margin:20px 0}.t{font-size:22px;font-style:italic;margin:25px 0}.f{font-size:11px;text-align:center;padding:15px 0;border-top:1px solid}</style></head>\r\n";
+    "<style>*{margin:0;padding:0;box-sizing:border-box}body{padding:10px;font-family:Arial,sans-serif}.c{max-width:1200px;margin:0 auto}.l{padding:8px 15px;margin-bottom:10px;text-align:right}.l a{text-decoration:none;padding:5px 10px;margin:0 2px}.l a:hover{font-weight:bold}.n{padding:10px;margin-bottom:15px;text-align:center}.n a{text-decoration:none;padding:6px 12px;margin:3px;display:inline-block}.n a:hover{font-weight:bold}.x{padding:30px 20px;text-align:center;margin-bottom:10px}.c1{font-size:20px;font-style:italic;margin:15px 0}.p{font-size:32px;font-style:italic;margin:20px 0}.t{font-size:22px;font-style:italic;margin:25px 0}.f{font-size:11px;text-align:center;padding:15px 0;border-top:1px solid}.inf{background-color:#ffffff;border-style:inset;border-width:2px}.ledr{background-color:#ff0000;border-style:solid;border-color:#000000;border-width:2px}.ledg{background-color:#00ff00;border-style:solid;border-color:#000000;border-width:2px}.off{background-color:#ffffff;border-style:solid;border-color:#000000;border-width:2px}</style></head>\r\n";
 
 /* 响应式CSS样式 (fx_acclog.c等使用) - 完整的响应式设计 */
 static const char HTML_Component_CSS_Responsive[] =
@@ -42,23 +42,13 @@ static const char HTML_Component_CSS_Responsive[] =
 
 /* Body开始标签 (新版) */
 static const char HTML_Component_Body_Start_New[] =
-    "<body>\r\n";
+    "<body bgcolor=\"#cccccc\" style=\"margin-bottom:0px\">\r\n";
 
-/* 新版语言选择栏 (index.c) */
-static const char HTML_Component_Lang_Bar_New[] =
-    "<div class=\"l\"><a href=\"index.html?LANG=ZS\">简体中文</a><a href=\"index.html?LANG=EN\">English</a><a href=\"index.html?LANG=JA\">日本語</a></div>\r\n";
 
-/* 响应式语言选择栏 (fx_acclog.c等使用) */
-static const char HTML_Component_Lang_Bar_Responsive[] =
-    "<div class=\"lang-bar\">\r\n"
-    "<a href=\"%s?CMD=监视开始&LANG=ZS\">简体中文</a>\r\n"
-    "<a href=\"%s?CMD=监视开始&LANG=EN\">English</a>\r\n"
-    "<a href=\"%s?CMD=监视开始&LANG=JA\">日本語</a>\r\n"
-    "</div>\r\n";
 
 /* 新版导航栏 (index.c) */
 static const char HTML_Component_Nav_Bar_New[] =
-    "<div class=\"n\"><a href=\"index.html?LANG=ZS\">主页</a><a href=\"fx_devmon.html?LANG=ZS\">软元件监视</a><a href=\"fx_plcinf.html?LANG=ZS\">PLC信息</a><a href=\"fx_enetinf.html?LANG=ZS\">ADP信息</a><a href=\"fx_status.html?LANG=ZS\">通信状态</a><a href=\"fx_acclog.html?LANG=ZS\">访问履历</a></div>\r\n";
+    "<table rules=\"all\" cellspacing=\"0\" cellpadding=\"0\" style=\"table-layout:fixed; font-size:12px\"><tbody><tr><td align=\"center\" width=\"60\"><a href=\"index.html?LANG=ZS\">主页</a></td><td align=\"center\" width=\"220\"><a href=\"fx_devmon.html?LANG=ZS\">软元件/缓冲存储器批量监视</a></td><td align=\"center\" width=\"110\"><a href=\"fx_plcinf.html?CMD=%BC%E0%CA%D3%BF%AA%CA%BC&amp;LANG=ZS\">PLC信息</a></td><td align=\"center\" width=\"180\"><a href=\"fx_enetinf.html?CMD=%BC%E0%CA%D3%BF%AA%CA%BC&amp;LANG=ZS\">FX3U-ENET-ADP信息</a></td><td align=\"center\" width=\"140\"><a href=\"fx_status.html?CMD=%BC%E0%CA%D3%BF%AA%CA%BC&amp;LANG=ZS\">通信状态</a></td><td align=\"center\" width=\"90\"><a href=\"fx_acclog.html?CMD=%BC%E0%CA%D3%BF%AA%CA%BC&amp;LANG=ZS\">访问履历</a></td></tr></tbody></table>\r\n";
 
 /* 响应式导航栏 (fx_acclog.c等使用) */
 static const char HTML_Component_Nav_Bar_Responsive[] =
@@ -134,10 +124,6 @@ const char* HTML_GetComponent(html_component_type_t comp_type)
             return HTML_Component_CSS_Responsive;
         case HTML_COMP_BODY_START_NEW:
             return HTML_Component_Body_Start_New;
-        case HTML_COMP_LANG_BAR_NEW:
-            return HTML_Component_Lang_Bar_New;
-        case HTML_COMP_LANG_BAR_RESPONSIVE:
-            return HTML_Component_Lang_Bar_Responsive;
         case HTML_COMP_NAV_BAR_NEW:
             return HTML_Component_Nav_Bar_New;
         case HTML_COMP_NAV_BAR_RESPONSIVE:

@@ -35,8 +35,6 @@ typedef enum {
     HTML_COMP_CSS_NEW ,             /* 新版CSS样式 (index.c) */
     HTML_COMP_CSS_RESPONSIVE ,      /* 响应式CSS样式 (fx_acclog.c等) */
     HTML_COMP_BODY_START_NEW ,      /* <body>开始 (新版) */
-    HTML_COMP_LANG_BAR_NEW ,        /* 新版语言选择栏 */
-    HTML_COMP_LANG_BAR_RESPONSIVE ,  /* 响应式语言选择栏 */
     HTML_COMP_NAV_BAR_NEW ,         /* 新版导航栏 */
     HTML_COMP_NAV_BAR_RESPONSIVE ,  /* 响应式导航栏 */
     HTML_COMP_FORM_START ,          /* 表单开始 */

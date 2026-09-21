@@ -180,9 +180,9 @@ void SX_Begin(u8 sock, char type, u8 page_id)
                "Cache-Control: no-store\r\n"
                "\r\n";
     } else {
-        /* 源文件中的中文字符串为 UTF-8，此处必须与之一致，否则中文乱码 */
+        /* 源文件中的中文字符串为 GBK，此处必须与之一致，否则中文乱码 */
         head = "HTTP/1.1 200 OK\r\n"
-               "Content-Type: text/html; charset=UTF-8\r\n"
+               "Content-Type: text/html; charset=GBK\r\n"
                "Transfer-Encoding: chunked\r\n"
                "Cache-Control: no-store\r\n"
                "\r\n";

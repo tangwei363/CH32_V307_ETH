@@ -5,7 +5,7 @@
 #include "ch32v30x.h"
 #include "debug.h"
 #include "net_config.h"
-/* ç”¨æˆ·ç§æœ‰å®šä¹‰ç»“æŸ */
+/* ÓÃ»§Ë½ÓĞ¶¨Òå½áÊø */
 #ifdef _BSP_WCH_DEBUG
     #define WCH_DEBUG(format, ...)  printf (format, ##__VA_ARGS__)
 #else
@@ -13,31 +13,31 @@
 #endif
 
 
-/* å…¨å±€å®å®šä¹‰ */
-#define KEEPALIVE_ENABLE                1                   //ä¿æ´»åŠŸèƒ½å¼€å…³: 0=å…³é—­, 1=å¼€å¯
-#define PHY_DEBOUNCE_MS                 200                 //PHY é“¾è·¯çŠ¶æ€å»æŠ–æ—¶é—´(ms), é˜²æ­¢ç½‘çº¿æŠ–åŠ¨å¯¼è‡´é¢‘ç¹ä¸Šä¸‹çº¿
+/* È«¾Öºê¶¨Òå */
+#define KEEPALIVE_ENABLE                1                   //±£»î¹¦ÄÜ¿ª¹Ø: 0=¹Ø±Õ, 1=¿ªÆô
+#define PHY_DEBOUNCE_MS                 200                 //PHY Á´Â·×´Ì¬È¥¶¶Ê±¼ä(ms), ·ÀÖ¹ÍøÏß¶¶¶¯µ¼ÖÂÆµ·±ÉÏÏÂÏß
 
 
 typedef struct WCH_SOCKET_Type  
 {    
-    uint8_t  net_stat;              //è¿æ¥çŠ¶æ€: 0=æœªè¿æ¥, 1=å·²è¿æ¥
-    uint8_t  DesSockId;             //ç›®æ ‡ SOCKET ID
-    uint32_t DesPort;               //ç›®æ ‡ç«¯å£å·
+    uint8_t  net_stat;              //Á¬½Ó×´Ì¬: 0=Î´Á¬½Ó, 1=ÒÑÁ¬½Ó
+    uint8_t  DesSockId;             //Ä¿±ê SOCKET ID
+    uint32_t DesPort;               //Ä¿±ê¶Ë¿ÚºÅ
 
-    uint8_t  SourSockId;            //æº SOCKET ID
-    uint8_t  SourIP[4];             //æº IP åœ°å€
-    uint32_t SourPort;              //æºç«¯å£å·
+    uint8_t  SourSockId;            //Ô´ SOCKET ID
+    uint8_t  SourIP[4];             //Ô´ IP µØÖ·
+    uint32_t SourPort;              //Ô´¶Ë¿ÚºÅ
 
 } WCH_SOCKET_T;
 
-/* æ¯ä¸ª Socket çš„æ§åˆ¶ä¿¡æ¯: å¯¹åº” eth_socket[] ç´¢å¼• */
+/* Ã¿¸ö Socket µÄ¿ØÖÆĞÅÏ¢: ¶ÔÓ¦ eth_socket[] Ë÷Òı */
 typedef struct {
-    int8_t  eth_sid;               /* eth_socket[] ç´¢å¼•, -1=æœªæ˜ å°„ */
+    int8_t  eth_sid;               /* eth_socket[] Ë÷Òı, -1=Î´Ó³Éä */
 } WCH_SocketCtrl_t;
 
-extern u8 MACAddr[6];                       //MAC åœ°å€
-extern u8 SocketRecvBuf[WCHNET_NUM_UDP+WCHNET_NUM_IPRAW][RECE_BUF_LEN];  //socket æ¥æ”¶ç¼“å†²
-extern u16 DESPORT, SRCPORT;                //ç›®çš„ç«¯å£ / æºç«¯å£
+extern u8 MACAddr[6];                       //MAC µØÖ·
+extern u8 SocketRecvBuf[WCHNET_NUM_UDP+WCHNET_NUM_IPRAW][RECE_BUF_LEN];  //socket ½ÓÊÕ»º³å
+extern u16 DESPORT, SRCPORT;                //Ä¿µÄ¶Ë¿Ú / Ô´¶Ë¿Ú
 
 void mStopIfError(u8 iError);
  
@@ -45,22 +45,22 @@ void TIM1_INT_Init(u16 arr, u16 psc);
 void TIM2_Init(void);
 
 /**
- * @brief   åˆ›å»ºç”¨äºç›‘å¬çš„ TCP Socket, æŒ‡å®š socket ID ä¸ç›‘å¬ç«¯å£
+ * @brief   ´´½¨ÓÃÓÚ¼àÌıµÄ TCP Socket, Ö¸¶¨ socket ID Óë¼àÌı¶Ë¿Ú
  *
- * @param   socket_id - å­˜æ”¾åˆ›å»ºæˆåŠŸçš„ socket ID çš„æŒ‡é’ˆ
- * @param   listen_port - ç›‘å¬ç«¯å£å·
+ * @param   socket_id - ´æ·Å´´½¨³É¹¦µÄ socket ID µÄÖ¸Õë
+ * @param   listen_port - ¼àÌı¶Ë¿ÚºÅ
  *
- * @return  socket åˆ›å»ºç»“æœ: WCHNET_ERR_SUCCESS è¡¨ç¤ºæˆåŠŸ, å¦åˆ™ä¸ºé”™è¯¯ç 
+ * @return  socket ´´½¨½á¹û: WCHNET_ERR_SUCCESS ±íÊ¾³É¹¦, ·ñÔòÎª´íÎóÂë
  */
 u8 WCHNET_CreateTcpSocketListen(u8 *socket_id, u16 listen_port);
 
 /**
- * @brief   åˆ›å»º UDP Socket, æŒ‡å®š socket ID ä¸ç«¯å£
+ * @brief   ´´½¨ UDP Socket, Ö¸¶¨ socket ID Óë¶Ë¿Ú
  *
- * @param   socket_id - å­˜æ”¾åˆ›å»ºæˆåŠŸçš„ socket ID çš„æŒ‡é’ˆ
- * @param   udp_port - ç»‘å®šçš„ UDP ç«¯å£å·
+ * @param   socket_id - ´æ·Å´´½¨³É¹¦µÄ socket ID µÄÖ¸Õë
+ * @param   udp_port - °ó¶¨µÄ UDP ¶Ë¿ÚºÅ
  *
- * @return  socket åˆ›å»ºç»“æœ: WCHNET_ERR_SUCCESS è¡¨ç¤ºæˆåŠŸ, å¦åˆ™ä¸ºé”™è¯¯ç 
+ * @return  socket ´´½¨½á¹û: WCHNET_ERR_SUCCESS ±íÊ¾³É¹¦, ·ñÔòÎª´íÎóÂë
  */
 u8 WCHNET_CreateUdpSocket(u8 *socket_id, u16 udp_port);
 
@@ -72,6 +72,6 @@ void WCHNET_HandleSockInt(u8 socketid, u8 intstat);
 void WCHNET_HandleGlobalInt(void);
 void socket_map_init(void);
 
-extern WCH_SocketCtrl_t socket_ctrl[WCHNET_MAX_SOCKET_NUM]; /* æ¯ä¸ª Socket çš„æ§åˆ¶ä¿¡æ¯ */
+extern WCH_SocketCtrl_t socket_ctrl[WCHNET_MAX_SOCKET_NUM]; /* Ã¿¸ö Socket µÄ¿ØÖÆĞÅÏ¢ */
 
 #endif /* end of bsp_wch_net.h */

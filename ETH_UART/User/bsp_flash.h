@@ -7,21 +7,21 @@
 /* Global define */
 
 /* CH32V307VC Flash: 512KB, 0x08000000 ~ 0x0807FFFF
- * Bank1åŒºåŸŸ: 0x08000000 ~ 0x0803FFFF (256KB)
- * ä»£ç åŒºç”±é“¾æŽ¥è„šæœ¬åˆ†é…, é…ç½®åŒºæ”¾åœ¨ Bank1 æœ«å°¾ 3 ä¸ª 256B å¿«é€Ÿé¡µ.
+ * Bank1ÇøÓò: 0x08000000 ~ 0x0803FFFF (256KB)
+ * ´úÂëÇøÓÉÁ´½Ó½Å±¾·ÖÅä, ÅäÖÃÇø·ÅÔÚ Bank1 Ä©Î² 3 ¸ö 256B ¿ìËÙÒ³.
  *
- * ä½¿ç”¨ FLASH_ErasePage_Fast (256B/é¡µ) ç²¾ç»†æ“¦é™¤, æ¯é¡¹é…ç½®ç‹¬å ä¸€é¡µ.
- * å¦ä¿ç•™ FLASH_PAGE_SIZE (4KB) ä¾›æ ‡å‡†æ“¦é™¤å‡½æ•°ä½¿ç”¨.
+ * Ê¹ÓÃ FLASH_ErasePage_Fast (256B/Ò³) ¾«Ï¸²Á³ý, Ã¿ÏîÅäÖÃ¶ÀÕ¼Ò»Ò³.
+ * Áí±£Áô FLASH_PAGE_SIZE (4KB) ¹©±ê×¼²Á³ýº¯ÊýÊ¹ÓÃ.
  *
- * åœ°å€å¸ƒå±€ (FLASH_PAGE_SIZE_FAST=256):
+ * µØÖ·²¼¾Ö (FLASH_PAGE_SIZE_FAST=256):
  *   PAGE_WRITE_START_ADDR = 0x0803FD00  (Bank1æœ«å°¾ - 3Ã—256B)
- *   BASIC_CFG_ADDR        = 0x0803FD00  ç¬¬1é¡µ Basicé…ç½® (256B)
- *   PORT_CFG_ADDR         = 0x0803FE00  ç¬¬2é¡µ Porté…ç½®  (256B)
- *   LOGIN_CFG_ADDR        = 0x0803FF00  ç¬¬3é¡µ Loginé…ç½® (256B)
- *   PAGE_WRITE_END_ADDR   = 0x08040000  (è¶Šç•Œå“¨å…µ, Bank1è¾¹ç•Œ)
+ *   BASIC_CFG_ADDR        = 0x0803FD00  µÚ1Ò³ BasicÅäÖÃ (256B)
+ *   PORT_CFG_ADDR         = 0x0803FE00  µÚ2Ò³ PortÅäÖÃ  (256B)
+ *   LOGIN_CFG_ADDR        = 0x0803FF00  µÚ3Ò³ LoginÅäÖÃ (256B)
+ *   PAGE_WRITE_END_ADDR   = 0x08040000  (Ô½½çÉÚ±ø, Bank1±ß½ç)
  */
 #define FLASH_PAGE_SIZE           (4096)
-#define FLASH_PAGE_SIZE_FAST      (256)   /* å¿«é€Ÿæ“¦é™¤å•é¡µå¤§å° 256B */
+#define FLASH_PAGE_SIZE_FAST      (256)   /* ¿ìËÙ²Á³ýµ¥Ò³´óÐ¡ 256B */
 #define FLASH_BANK1_END_ADDR      ((uint32_t)0x0803FFFF)
 #define CFG_PAGE_COUNT            (3)
 #define PAGE_WRITE_START_ADDR     ((uint32_t)FLASH_BANK1_END_ADDR + 1 - (FLASH_PAGE_SIZE_FAST * CFG_PAGE_COUNT))

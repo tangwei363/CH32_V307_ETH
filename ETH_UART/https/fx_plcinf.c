@@ -18,6 +18,7 @@
 #include "bsp_rtc.h"
 #include "ethernet_app.h"
 /* 全局变量定义 */
+#define FX_PLCINF_TABLE_ROWS  11
 static fx_plcinf_info_t g_plc_info;
 static fx_plcinf_error_t g_errors[FX_PLCINF_MAX_ERRORS];
  
@@ -132,9 +133,9 @@ static char* FX_PLCINF_GenerateErrorTable(void)
            "<tbody>\r\n"
            "<tr>\r\n"
            "<td>\r\n"
-           "<table border=\"1\" cellspacing=\"0\" style=\"text-align:center;font-size:14px\">\r\n"
+           "<table border=\"1\" cellspacing=\"0\" bgcolor=\"#ffffff\" style=\"text-align:center;font-size:14px\">\r\n"
            "<tbody>\r\n"
-           "<tr>\r\n"
+           "<tr bgcolor=\"#cccccc\">\r\n"
            "<td width=\"50\">No.</td>\r\n"
            "<td width=\"120\">错误步</td>\r\n"
            "<td width=\"300\">当前错误</td>\r\n"
@@ -168,7 +169,7 @@ static char* FX_PLCINF_GenerateErrorTable(void)
     }
     
     /* 填充剩余空行 */
-    for (i = has_error ? 1 : 1; i < FX_PLCINF_MAX_ERRORS; i++) {
+    for (i = 1; i < FX_PLCINF_TABLE_ROWS; i++) {
         MITSU_HTTP_Emit(
                "<tr>\r\n"
                "<td>&nbsp;</td>\r\n"
@@ -210,7 +211,15 @@ void FX_PLCINF_GetError(uint8_t index, fx_plcinf_error_t *error)
         memcpy(error, &g_errors[index], sizeof(fx_plcinf_error_t));
     }
 }
- 
+
+ /* LED 状态 -> CSS 类名（原厂配色: 绿=ledg, 红=ledr, 灭=off） */
+static const char* FX_PLCINF_LEDClass(fx_plcinf_led_state_t st)
+{
+    if (st == FX_PLC_LED_GREEN) { return "ledg"; }
+    if (st == FX_PLC_LED_RED)   { return "ledr"; }
+    return "off";
+}
+
  
 /*********************************************************************
  * @fn      FX_PLCINF_SendWebPage
@@ -222,6 +231,7 @@ void FX_PLCINF_GetError(uint8_t index, fx_plcinf_error_t *error)
  *
  * @return  none
  */
+
 void FX_PLCINF_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,char *url)
 {
     char *temp_buffer = HtmlBuffer;
@@ -253,7 +263,6 @@ void FX_PLCINF_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,char *url)
     /* 第二次打包: body开始到导航栏结束 (使用共享组件) */
     offset = 0;
     offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_BODY_START_NEW));
-    offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_LANG_BAR_NEW));
     offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_NAV_BAR_NEW));
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     /* 第四次打包: 内容区域开始和表单开始 */
@@ -265,8 +274,9 @@ void FX_PLCINF_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,char *url)
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     /* 第五次打包: PLC信息表格开始和标题行 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" style=\"table-layout:fixed; font-size:14px; margin:0 auto;\">\r\n");
+    offset += sprintf(temp_buffer + offset, "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" style=\"table-layout:fixed; font-size:14px;\">\r\n");
     offset += sprintf(temp_buffer + offset, "<tbody>\r\n");
+    offset += sprintf(temp_buffer + offset, "<tr><td width=\"20\"></td><td width=\"50\"></td><td width=\"10\"></td><td width=\"50\"></td><td width=\"10\"></td><td width=\"90\"></td><td width=\"200\"></td><td width=\"170\"></td><td width=\"80\"></td><td width=\"80\"></td></tr>\r\n");
     offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"7\">PLC信息</td><td colspan=\"1\" align=\"right\">状态 :&nbsp;</td><td colspan=\"2\">%s</td></tr>\r\n", monitor_status);
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     /* 第六次打包: CPU类型和CPU版本行 */
@@ -285,13 +295,14 @@ void FX_PLCINF_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,char *url)
     offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"1\"></td><td colspan=\"5\">时间</td><td colspan=\"1\" class=\"inf\" align=\"right\">%02d:%02d:%02d</td><td colspan=\"3\"></td></tr>\r\n", calendar.hour, calendar.min, calendar.sec);
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     // /* 第九次打包: LED状态行 */
-    // offset = 0;
-    // offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"10\">&nbsp;</td></tr>\r\n");
-    // offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"1\"></td><td colspan=\"1\" align=\"right\">POWER</td><td colspan=\"1\"></td><td colspan=\"1\" class=\"%s\">&nbsp;</td><td colspan=\"6\"></td></tr>\r\n", HTML_GetLEDClass_Old(g_plc_info.led_power == FX_PLC_LED_GREEN ? 1 : 0));
-    // offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"1\"></td><td colspan=\"1\" align=\"right\">RUN</td><td colspan=\"1\"></td><td colspan=\"1\" class=\"%s\">&nbsp;</td><td colspan=\"6\"></td></tr>\r\n", HTML_GetLEDClass_Old(g_plc_info.led_run == FX_PLC_LED_GREEN ? 1 : 0));
-    // offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"1\"></td><td colspan=\"1\" align=\"right\">BATT</td><td colspan=\"1\"></td><td colspan=\"1\" class=\"%s\">&nbsp;</td><td colspan=\"6\"></td></tr>\r\n", HTML_GetLEDClass_Old(g_plc_info.led_batt == FX_PLC_LED_RED ? 2 : 0));
-    // offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"1\"></td><td colspan=\"1\" align=\"right\">ERROR</td><td colspan=\"1\"></td><td colspan=\"1\" class=\"%s\">&nbsp;</td><td colspan=\"6\"></td></tr>\r\n", HTML_GetLEDClass_Old(g_plc_info.led_error == FX_PLC_LED_RED ? 2 : 0));
-    // Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
+    offset = 0;
+    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"10\">&nbsp;</td></tr>\r\n");
+    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"10\">LED状态</td></tr>\r\n");
+    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"1\"></td><td colspan=\"1\" align=\"right\">POWER</td><td colspan=\"1\"></td><td colspan=\"1\" class=\"%s\">&nbsp;</td><td colspan=\"6\"></td></tr>\r\n", FX_PLCINF_LEDClass(g_plc_info.led_power));
+    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"1\"></td><td colspan=\"1\" align=\"right\">RUN</td><td colspan=\"1\"></td><td colspan=\"1\" class=\"%s\">&nbsp;</td><td colspan=\"6\"></td></tr>\r\n", FX_PLCINF_LEDClass(g_plc_info.led_run));
+    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"1\"></td><td colspan=\"1\" align=\"right\">BATT</td><td colspan=\"1\"></td><td colspan=\"1\" class=\"%s\">&nbsp;</td><td colspan=\"6\"></td></tr>\r\n", FX_PLCINF_LEDClass(g_plc_info.led_batt));
+    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"1\"></td><td colspan=\"1\" align=\"right\">ERROR</td><td colspan=\"1\"></td><td colspan=\"1\" class=\"%s\">&nbsp;</td><td colspan=\"6\"></td></tr>\r\n", FX_PLCINF_LEDClass(g_plc_info.led_error));
+    Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     /* 第十次打包: 表格结束和隐藏字段 */
     offset = 0;
     offset += sprintf(temp_buffer + offset, "</tbody>\r\n");
@@ -302,8 +313,8 @@ void FX_PLCINF_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,char *url)
 
     /* 第十一次打包: 错误信息表格标题 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\">\r\n");
-    offset += sprintf(temp_buffer + offset, "<tbody><tr><td>错误信息</td></tr></tbody>\r\n");
+    offset += sprintf(temp_buffer + offset, "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" bgcolor=\"#ffffff\">\r\n");
+    offset += sprintf(temp_buffer + offset, "<tbody><tr><td bgcolor=\"#cccccc\">错误信息</td></tr></tbody>\r\n");
     offset += sprintf(temp_buffer + offset, "</table>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 

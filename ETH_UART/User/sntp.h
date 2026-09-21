@@ -35,20 +35,20 @@ typedef unsigned int tdist;
 
 typedef struct _ntpformat
 {
-    uint8_t  *dstaddr;        /* ç›®æ ‡æœåŠ¡å™¨åœ°å€ï¼ˆæœ¬åœ°ï¼‰ */
-    char    version;        /* NTPç‰ˆæœ¬å· */
-    char    leap;           /* é—°ç§’æŒ‡ç¤ºå™¨ */
-    char    mode;           /* NTPå·¥ä½œæ¨¡å¼ */
-    char    stratum;        /* æ—¶é—´å±‚çº§ï¼ˆæœåŠ¡å™¨çº§åˆ«ï¼‰ */
-    char    poll;           /* è½®è¯¢é—´éš”ï¼ˆä»¥2çš„å¹‚æ¬¡æ–¹è¡¨ç¤ºï¼‰ */
-    s_char  precision;      /* æ—¶é—´ç²¾åº¦ï¼ˆä»¥ç§’ä¸ºå•ä½çš„2çš„å¹‚æ¬¡æ–¹ï¼‰ */
-    tdist   rootdelay;      /* åˆ°ä¸»å‚è€ƒæºçš„å¾€è¿”å»¶è¿Ÿ */
-    tdist   rootdisp;       /* æœ€å¤§è¯¯å·®ï¼ˆæ ¹ç¦»æ•£åº¦ï¼‰ */
-    char    refid;          /* å‚è€ƒæ—¶é’Ÿæ ‡è¯†ç¬¦ */
-    tstamp  reftime;        /* ä¸Šæ¬¡æ›´æ–°æ—¶é—´çš„æ—¶é—´æˆ³ */
-    tstamp  org;            /* åŸå§‹æ—¶é—´æˆ³ï¼ˆå®¢æˆ·ç«¯å‘é€æ—¶é—´ï¼‰ */
-    tstamp  rec;            /* æ¥æ”¶æ—¶é—´æˆ³ï¼ˆæœåŠ¡å™¨æ¥æ”¶æ—¶é—´ï¼‰ */
-    tstamp  xmt;            /* å‘é€æ—¶é—´æˆ³ï¼ˆæœåŠ¡å™¨å‘é€æ—¶é—´ï¼‰ */
+    uint8_t  *dstaddr;        /* Ä¿±ê·şÎñÆ÷µØÖ·£¨±¾µØ£© */
+    char    version;        /* NTP°æ±¾ºÅ */
+    char    leap;           /* ÈòÃëÖ¸Ê¾Æ÷ */
+    char    mode;           /* NTP¹¤×÷Ä£Ê½ */
+    char    stratum;        /* Ê±¼ä²ã¼¶£¨·şÎñÆ÷¼¶±ğ£© */
+    char    poll;           /* ÂÖÑ¯¼ä¸ô£¨ÒÔ2µÄÃİ´Î·½±íÊ¾£© */
+    s_char  precision;      /* Ê±¼ä¾«¶È£¨ÒÔÃëÎªµ¥Î»µÄ2µÄÃİ´Î·½£© */
+    tdist   rootdelay;      /* µ½Ö÷²Î¿¼Ô´µÄÍù·µÑÓ³Ù */
+    tdist   rootdisp;       /* ×î´óÎó²î£¨¸ùÀëÉ¢¶È£© */
+    char    refid;          /* ²Î¿¼Ê±ÖÓ±êÊ¶·û */
+    tstamp  reftime;        /* ÉÏ´Î¸üĞÂÊ±¼äµÄÊ±¼ä´Á */
+    tstamp  org;            /* Ô­Ê¼Ê±¼ä´Á£¨¿Í»§¶Ë·¢ËÍÊ±¼ä£© */
+    tstamp  rec;            /* ½ÓÊÕÊ±¼ä´Á£¨·şÎñÆ÷½ÓÊÕÊ±¼ä£© */
+    tstamp  xmt;            /* ·¢ËÍÊ±¼ä´Á£¨·şÎñÆ÷·¢ËÍÊ±¼ä£© */
 } ntpformat;
 
 typedef struct _datetime
@@ -61,8 +61,8 @@ typedef struct _datetime
     uint8_t ss;
 } datetime;
 
-#define ntp_port            123                     // NTPæœåŠ¡å™¨ç«¯å£å·
-#define SECS_PERDAY         86400UL                 // ä¸€å¤©çš„ç§’æ•° = 60*60*24
+#define ntp_port            123                     // NTP·şÎñÆ÷¶Ë¿ÚºÅ
+#define SECS_PERDAY         86400UL                 // Ò»ÌìµÄÃëÊı = 60*60*24
 #define UTC_ADJ_HRS         9                       // SEOUL : GMT+9
 #define UTC_ADJ_HRS         9                       // SEOUL : GMT+9
 #define EPOCH               1900                    // NTP start year

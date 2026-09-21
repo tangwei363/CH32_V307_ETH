@@ -67,8 +67,8 @@ u8 RTC_Init(void)
     RTC_ClearITPendingBit(RTC_IT_ALR);
     RTC_ClearITPendingBit(RTC_IT_SEC);
 
-    /* 本板无外晶振、无RTC电池, RTC仅作秒定时基准;
-       真实时间每次上电由PLC下发覆盖, 故无需"是否已配置"检测, 每次直接(重新)初始化 */
+    /* �������⾧����RTC���, RTC�����붨ʱ��׼;
+       ��ʵʱ��ÿ���ϵ���PLC�·�����, ������"�Ƿ�������"���, ÿ��ֱ��(����)��ʼ�� */
     RCC_LSICmd(ENABLE);                          // 使能内部低速晶振(LSI, 标称≈40kHz)
     while(RCC_GetFlagStatus(RCC_FLAG_LSIRDY) == RESET && temp < 250)
     {
@@ -76,20 +76,20 @@ u8 RTC_Init(void)
         Delay_Ms(20);
     }
     if(temp >= 250)
-        return 1;                                // LSI 起振失败
+        return 1;                                // LSI ����ʧ��
 
-    RCC_RTCCLKConfig(RCC_RTCCLKSource_LSI);      // 选 LSI 作 RTC 时钟
+    RCC_RTCCLKConfig(RCC_RTCCLKSource_LSI);      // ѡ LSI �� RTC ʱ��
     RCC_RTCCLKCmd(ENABLE);
     RTC_WaitForLastTask();
     RTC_WaitForSynchro();
 
-    RTC_ITConfig(RTC_IT_SEC, ENABLE);            // 1秒周期中断
+    RTC_ITConfig(RTC_IT_SEC, ENABLE);            // 1�������ж�
     RTC_WaitForLastTask();
 
     RTC_EnterConfigMode();
     RTC_SetPrescaler(39999);                     // LSI≈40kHz → 40k 分频得到 1Hz 秒节拍
     RTC_WaitForLastTask();
-    RTC_Set(2026, 10, 1, 0, 0, 0);               // 初始基准(上电后由PLC时间覆盖)
+    RTC_Set(2026, 10, 1, 0, 0, 0);               // ��ʼ��׼(�ϵ����PLCʱ�串��)
     RTC_ExitConfigMode();
 
     RTC_NVIC_Config();

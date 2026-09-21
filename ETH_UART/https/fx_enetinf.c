@@ -446,7 +446,6 @@ void FX_ENETINF_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,char *url)
     /* 第二次打包: body开始到导航栏结束 (使用共享组件) */
     offset = 0;
     offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_BODY_START_NEW));
-    offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_LANG_BAR_NEW));
     offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_NAV_BAR_NEW));
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     /* 第四次打包: 表单开始和适配器信息标题 */

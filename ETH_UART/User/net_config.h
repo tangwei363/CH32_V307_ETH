@@ -3,10 +3,10 @@
 * Author             : WCH
 * Version            : V1.30
 * Date               : 2022/06/02
-* Description        : æœ¬æ–‡ä»¶åŒ…å«ä»¥å¤ªç½‘åè®®æ ˆåº“çš„é…ç½®
+* Description        : ±¾ÎÄ¼þ°üº¬ÒÔÌ«ÍøÐ­ÒéÕ»¿âµÄÅäÖÃ
 *********************************************************************************
 * Copyright (c) 2021 Nanjing Qinheng Microelectronics Co., Ltd.
-* Attention: æœ¬è½¯ä»¶(æ— è®ºæ˜¯å¦ä¿®æ”¹)åŠå…¶äºŒè¿›åˆ¶æ–‡ä»¶ç”¨äºŽå—äº¬æ²æ’å¾®ç”µå­ç”Ÿäº§çš„å¾®æŽ§åˆ¶å™¨ã€‚
+* Attention: ±¾Èí¼þ(ÎÞÂÛÊÇ·ñÐÞ¸Ä)¼°Æä¶þ½øÖÆÎÄ¼þÓÃÓÚÄÏ¾©ÇßºãÎ¢µç×ÓÉú²úµÄÎ¢¿ØÖÆÆ÷¡£
 *******************************************************************************/
 #ifndef __NET_CONFIG_H__
 #define __NET_CONFIG_H__
@@ -16,147 +16,147 @@ extern "C" {
 #endif
 
 /*********************************************************************
- * socket é…ç½®, IPRAW + UDP + TCP + TCP_LISTEN = socket æ€»æ•°
+ * socket ÅäÖÃ, IPRAW + UDP + TCP + TCP_LISTEN = socket ×ÜÊý
  */
-#define WCHNET_NUM_IPRAW              1  /* IPRAW è¿žæŽ¥æ•° */
+#define WCHNET_NUM_IPRAW              1  /* IPRAW Á¬½ÓÊý */
 
-#define WCHNET_NUM_UDP                2  /* æ–¹æ¡ˆA: ä¿ç•™ 2(UDP=4 ä¼šä½¿ SocketRecvBuf è¾¾11.4KBä¸”æ€»socket=13, è¶…é¢„ç®—) */
+#define WCHNET_NUM_UDP                2  /* ·½°¸A: ±£Áô 2(UDP=4 »áÊ¹ SocketRecvBuf ´ï11.4KBÇÒ×Üsocket=13, ³¬Ô¤Ëã) */
 
-#define WCHNET_NUM_TCP                4  /* TCP è¿žæŽ¥æ•° (åŽŸä¸º4, ä¸ºæå‡å¤šå®¢æˆ·ç«¯ç¨³å®šæ€§è€Œå¢žåŠ ) */
+#define WCHNET_NUM_TCP                4  /* TCP Á¬½ÓÊý (Ô­Îª4, ÎªÌáÉý¶à¿Í»§¶ËÎÈ¶¨ÐÔ¶øÔö¼Ó) */
 
-//ç”¨äºŽé…ç½® TCP ç›‘å¬çš„ä¸ªæ•°ï¼Œæœ€å°å€¼ä¸º 1ã€‚TCP ç›‘å¬çš„ socket ä»…ä»…ç”¨äºŽç›‘å¬ï¼Œ
-//ä¸€æ—¦ç›‘å¬åˆ°TCP è¿žæŽ¥ï¼Œä¼šç«‹å³åˆ†é…ä¸€ä¸ª TCP è¿žæŽ¥ï¼Œå ç”¨ WCHNET_NUM_TCP çš„ä¸ªæ•°ã€‚
-#define WCHNET_NUM_TCP_LISTEN         4  /* TCP ç›‘å¬æ•° */
+//ÓÃÓÚÅäÖÃ TCP ¼àÌýµÄ¸öÊý£¬×îÐ¡ÖµÎª 1¡£TCP ¼àÌýµÄ socket ½ö½öÓÃÓÚ¼àÌý£¬
+//Ò»µ©¼àÌýµ½TCP Á¬½Ó£¬»áÁ¢¼´·ÖÅäÒ»¸ö TCP Á¬½Ó£¬Õ¼ÓÃ WCHNET_NUM_TCP µÄ¸öÊý¡£
+#define WCHNET_NUM_TCP_LISTEN         4  /* TCP ¼àÌýÊý */
 
-/* socket æ€»æ•°, æœ€å¤§ä¸º 31  */
+/* socket ×ÜÊý, ×î´óÎª 31  */
 #define WCHNET_MAX_SOCKET_NUM         (WCHNET_NUM_IPRAW+WCHNET_NUM_UDP+WCHNET_NUM_TCP+WCHNET_NUM_TCP_LISTEN)
 
-//TCP æœ€å¤§æŠ¥æ–‡æ®µçš„é•¿åº¦ï¼Œ
-#define WCHNET_TCP_MSS                1140  /* TCP MSS å¤§å° */
+//TCP ×î´ó±¨ÎÄ¶ÎµÄ³¤¶È£¬
+#define WCHNET_TCP_MSS                1140  /* TCP MSS ´óÐ¡ */
 
-#define WCHNET_NUM_POOL_BUF           (WCHNET_NUM_TCP*4+2)   /* POOL BUF æ•°é‡, å³æŽ¥æ”¶é˜Ÿåˆ—æ•°é‡ */
+#define WCHNET_NUM_POOL_BUF           (WCHNET_NUM_TCP*4+2)   /* POOL BUF ÊýÁ¿, ¼´½ÓÊÕ¶ÓÁÐÊýÁ¿ */
 
 /*********************************************************************
- * MAC é˜Ÿåˆ—é…ç½®
+ * MAC ¶ÓÁÐÅäÖÃ
  */
-#define ETH_TXBUFNB                   2    /* MAC å‘é€æè¿°ç¬¦æ•°é‡  */
+#define ETH_TXBUFNB                   2    /* MAC ·¢ËÍÃèÊö·ûÊýÁ¿  */
 
-#define ETH_RXBUFNB                   3    /* MAC æ”¶ç¼“å†²ä¸ªæ•°(æ–¹æ¡ˆB: 7â†’4â†’3, å†çœ~1.5KB SRAM, ä¸ºHTTPæ¨¡å—è…¾å‡ºRAM) */
+#define ETH_RXBUFNB                   3    /* MAC ÊÕ»º³å¸öÊý(·½°¸B: 7¡ú4¡ú3, ÔÙÊ¡~1.5KB SRAM, ÎªHTTPÄ£¿éÌÚ³öRAM) */
 
 #ifndef ETH_MAX_PACKET_SIZE
-#define ETH_RX_BUF_SZE                1520  /* MAC æŽ¥æ”¶ç¼“å†²é•¿åº¦, 4 çš„æ•´æ•°å€ */
-#define ETH_TX_BUF_SZE                1520  /* MAC å‘é€ç¼“å†²é•¿åº¦, 4 çš„æ•´æ•°å€ */
+#define ETH_RX_BUF_SZE                1520  /* MAC ½ÓÊÕ»º³å³¤¶È, 4 µÄÕûÊý±¶ */
+#define ETH_TX_BUF_SZE                1520  /* MAC ·¢ËÍ»º³å³¤¶È, 4 µÄÕûÊý±¶ */
 #else
 #define ETH_RX_BUF_SZE                ETH_MAX_PACKET_SIZE
 #define ETH_TX_BUF_SZE                ETH_MAX_PACKET_SIZE
 #endif
 
 /*********************************************************************
- *  åŠŸèƒ½é…ç½®
+ *  ¹¦ÄÜÅäÖÃ
  */
-#define WCHNET_PING_ENABLE            1     /* PINGåŠŸèƒ½å¼€å¯, é»˜è®¤å³å¼€å¯ */
+#define WCHNET_PING_ENABLE            1     /* PING¹¦ÄÜ¿ªÆô, Ä¬ÈÏ¼´¿ªÆô */
 
-#define TCP_RETRY_COUNT               1    /* TCPé‡ä¼ æ¬¡æ•° (åŽŸä¸º2, æ­¤å¤„6*250ms=1.5s å®¹é™) */
+#define TCP_RETRY_COUNT               1    /* TCPÖØ´«´ÎÊý (Ô­Îª2, ´Ë´¦6*250ms=1.5s ÈÝÏÞ) */
 
-#define TCP_RETRY_PERIOD              3    /* TCPé‡ä¼ å‘¨æœŸ, é»˜è®¤å€¼ä¸º10, å•ä½ä¸º50ms */
+#define TCP_RETRY_PERIOD              3    /* TCPÖØ´«ÖÜÆÚ, Ä¬ÈÏÖµÎª10, µ¥Î»Îª50ms */
 
-#define SOCKET_SEND_RETRY             1     /* å‘é€å¤±è´¥é‡è¯•é…ç½®, 1: å¯ç”¨, 0: ç¦ç”¨ */
+#define SOCKET_SEND_RETRY             1     /* ·¢ËÍÊ§°ÜÖØÊÔÅäÖÃ, 1: ÆôÓÃ, 0: ½ûÓÃ */
 
-#define HARDWARE_CHECKSUM_CONFIG      1     /* ç¡¬ä»¶æ ¡éªŒå’Œæ£€æµ‹ä¸Žæ’å…¥é…ç½®, 1: å¯ç”¨, 0: ç¦ç”¨ */
+#define HARDWARE_CHECKSUM_CONFIG      1     /* Ó²¼þÐ£ÑéºÍ¼ì²âÓë²åÈëÅäÖÃ, 1: ÆôÓÃ, 0: ½ûÓÃ */
 
-#define FINE_DHCP_PERIOD              8     /* DHCPç²¾ç»†åˆ·æ–°å‘¨æœŸ, é»˜è®¤å€¼ä¸º8, å•ä½ä¸º250ms */
+#define FINE_DHCP_PERIOD              8     /* DHCP¾«Ï¸Ë¢ÐÂÖÜÆÚ, Ä¬ÈÏÖµÎª8, µ¥Î»Îª250ms */
 
-#define CFG0_TCP_SEND_COPY            1     /* TCPå‘é€ç¼“å†²æ‹·è´, 1: æ‹·è´, 0: ä¸æ‹·è´ */
+#define CFG0_TCP_SEND_COPY            1     /* TCP·¢ËÍ»º³å¿½±´, 1: ¿½±´, 0: ²»¿½±´ */
 
-#define CFG0_TCP_RECV_COPY            1     /* TCPæŽ¥æ”¶æ‹·è´ä¼˜åŒ–, å†…éƒ¨è°ƒè¯•ç”¨é€” */
+#define CFG0_TCP_RECV_COPY            1     /* TCP½ÓÊÕ¿½±´ÓÅ»¯, ÄÚ²¿µ÷ÊÔÓÃÍ¾ */
 
-#define CFG0_TCP_OLD_DELETE           1     /* å¤šå®¢æˆ·ç«¯æ´»è·ƒæ—¶è¯¯è¸¢PLCé€šä¿¡é“¾è·¯ */
+#define CFG0_TCP_OLD_DELETE           1     /* ¶à¿Í»§¶Ë»îÔ¾Ê±ÎóÌßPLCÍ¨ÐÅÁ´Â· */
 
-#define CFG0_IP_REASS_PBUFS           0     /* IPåˆ†ç‰‡é‡ç»„ PBUF æ•°é‡ */
+#define CFG0_IP_REASS_PBUFS           0     /* IP·ÖÆ¬ÖØ×é PBUF ÊýÁ¿ */
 
-#define CFG0_TCP_DEALY_ACK_DISABLE    0     /* 1: ç¦ç”¨TCPå»¶è¿Ÿç¡®è®¤(DELAY ACK)  0: å¯ç”¨TCPå»¶è¿Ÿç¡®è®¤ */
+#define CFG0_TCP_DEALY_ACK_DISABLE    0     /* 1: ½ûÓÃTCPÑÓ³ÙÈ·ÈÏ(DELAY ACK)  0: ÆôÓÃTCPÑÓ³ÙÈ·ÈÏ */
 
 /*********************************************************************
- *  å†…å­˜ç›¸å…³é…ç½®
+ *  ÄÚ´æÏà¹ØÅäÖÃ
  */
-/* è‹¥éœ€æ›´é«˜ä¼ è¾“é€Ÿåº¦,
- * å¯å°è¯•å°† RECE_BUF_LEN å¢žå¤§åˆ° (WCHNET_TCP_MSS*4)
- * å¹¶å°† WCHNET_NUM_TCP_SEG å¢žå¤§åˆ° (WCHNET_NUM_TCP*4)*/
-#define RECE_BUF_LEN                  (WCHNET_TCP_MSS*2)   /* socket æŽ¥æ”¶ç¼“å†²å¤§å° */
+/* ÈôÐè¸ü¸ß´«ÊäËÙ¶È,
+ * ¿É³¢ÊÔ½« RECE_BUF_LEN Ôö´óµ½ (WCHNET_TCP_MSS*4)
+ * ²¢½« WCHNET_NUM_TCP_SEG Ôö´óµ½ (WCHNET_NUM_TCP*4)*/
+#define RECE_BUF_LEN                  (WCHNET_TCP_MSS*2)   /* socket ½ÓÊÕ»º³å´óÐ¡ */
 
-#define WCHNET_NUM_PBUF               WCHNET_NUM_POOL_BUF   /* PBUF ç»“æž„æ•°é‡ */
+#define WCHNET_NUM_PBUF               WCHNET_NUM_POOL_BUF   /* PBUF ½á¹¹ÊýÁ¿ */
 
-#define WCHNET_NUM_TCP_SEG            (WCHNET_NUM_TCP*2)   /* ç”¨äºŽå‘é€çš„ TCP æ®µæ•°é‡ */
+#define WCHNET_NUM_TCP_SEG            (WCHNET_NUM_TCP*2)   /* ÓÃÓÚ·¢ËÍµÄ TCP ¶ÎÊýÁ¿ */
 
-#define WCHNET_MEM_HEAP_SIZE          (((WCHNET_TCP_MSS+0x10+54+8)*WCHNET_NUM_TCP_SEG)+ETH_TX_BUF_SZE+64+2*0x18) /* å†…å­˜å †å¤§å° */
+#define WCHNET_MEM_HEAP_SIZE          (((WCHNET_TCP_MSS+0x10+54+8)*WCHNET_NUM_TCP_SEG)+ETH_TX_BUF_SZE+64+2*0x18) /* ÄÚ´æ¶Ñ´óÐ¡ */
 
-//ARP ç¼“å­˜ï¼Œå­˜æ”¾ IP å’Œ MACï¼Œæ­¤å€¼æœ€å°å¯ä»¥è®¾ç½®ä¸º 1ï¼Œæœ€å¤§ä¸º 0x7Fã€‚å¦‚æžœ WCHNET éœ€è¦å’Œ 4å° PC è¿›è¡Œç½‘ç»œé€šè®¯ï¼Œå…¶ä¸­ä¸¤å°ä¼šå¤§æ‰¹é‡æ”¶å‘æ•°æ®ï¼Œåˆ™å»ºè®®è®¾ç½®ä¸º 4ã€‚
-#define WCHNET_NUM_ARP_TABLE          4   /* ARP è¡¨é¡¹æ•°é‡ */
+//ARP »º´æ£¬´æ·Å IP ºÍ MAC£¬´ËÖµ×îÐ¡¿ÉÒÔÉèÖÃÎª 1£¬×î´óÎª 0x7F¡£Èç¹û WCHNET ÐèÒªºÍ 4Ì¨ PC ½øÐÐÍøÂçÍ¨Ñ¶£¬ÆäÖÐÁ½Ì¨»á´óÅúÁ¿ÊÕ·¢Êý¾Ý£¬Ôò½¨ÒéÉèÖÃÎª 4¡£
+#define WCHNET_NUM_ARP_TABLE          4   /* ARP ±íÏîÊýÁ¿ */
 
-#define WCHNET_MEM_ALIGNMENT          4    /* 4 å­—èŠ‚å¯¹é½ */
+#define WCHNET_MEM_ALIGNMENT          4    /* 4 ×Ö½Ú¶ÔÆë */
 
 #if CFG0_IP_REASS_PBUFS
-#define WCHNET_NUM_IP_REASSDATA       2    /* IP é‡ç»„ç»“æž„æ•°é‡ */
-/*1: ä½¿ç”¨åˆ†ç‰‡åŠŸèƒ½æ—¶,
- *  ç¡®ä¿ WCHNET_SIZE_POOL_BUF çš„å¤§å°è¶³ä»¥å­˜æ”¾å•ä¸ªåˆ†ç‰‡åŒ…*/
-#define WCHNET_SIZE_POOL_BUF    (((1500 + 14 + 4) + 3) & ~3)    /* æŽ¥æ”¶å•ä¸ªåŒ…çš„ç¼“å†²å¤§å° */
-/*2: åˆ›å»ºå¯æŽ¥æ”¶åˆ†ç‰‡åŒ…çš„ socket æ—¶,
- *  ç¡®ä¿ "struct _SOCK_INF" ç»“æž„çš„ "RecvBufLen" æˆå‘˜
- *  (è°ƒç”¨ WCHNET_SocketCreat æ—¶åˆå§‹åŒ–çš„å‚æ•°) è¶³ä»¥æŽ¥æ”¶å®Œæ•´åˆ†ç‰‡åŒ…  */
+#define WCHNET_NUM_IP_REASSDATA       2    /* IP ÖØ×é½á¹¹ÊýÁ¿ */
+/*1: Ê¹ÓÃ·ÖÆ¬¹¦ÄÜÊ±,
+ *  È·±£ WCHNET_SIZE_POOL_BUF µÄ´óÐ¡×ãÒÔ´æ·Åµ¥¸ö·ÖÆ¬°ü*/
+#define WCHNET_SIZE_POOL_BUF    (((1500 + 14 + 4) + 3) & ~3)    /* ½ÓÊÕµ¥¸ö°üµÄ»º³å´óÐ¡ */
+/*2: ´´½¨¿É½ÓÊÕ·ÖÆ¬°üµÄ socket Ê±,
+ *  È·±£ "struct _SOCK_INF" ½á¹¹µÄ "RecvBufLen" ³ÉÔ±
+ *  (µ÷ÓÃ WCHNET_SocketCreat Ê±³õÊ¼»¯µÄ²ÎÊý) ×ãÒÔ½ÓÊÕÍêÕû·ÖÆ¬°ü  */
 #else
-#define WCHNET_NUM_IP_REASSDATA       0    /* IP é‡ç»„ç»“æž„æ•°é‡ */
-#define WCHNET_SIZE_POOL_BUF     (((WCHNET_TCP_MSS + 40 + 14 + 4) + 3) & ~3) /* æŽ¥æ”¶å•ä¸ªåŒ…çš„ç¼“å†²å¤§å° */
+#define WCHNET_NUM_IP_REASSDATA       0    /* IP ÖØ×é½á¹¹ÊýÁ¿ */
+#define WCHNET_SIZE_POOL_BUF     (((WCHNET_TCP_MSS + 40 + 14 + 4) + 3) & ~3) /* ½ÓÊÕµ¥¸ö°üµÄ»º³å´óÐ¡ */
 #endif
 
-/* æ£€æŸ¥æŽ¥æ”¶ç¼“å†² */
+/* ¼ì²é½ÓÊÕ»º³å */
 #if(WCHNET_NUM_POOL_BUF * WCHNET_SIZE_POOL_BUF < ETH_RX_BUF_SZE)
-    #error "WCHNET_NUM_POOL_BUF æˆ– WCHNET_TCP_MSS é…ç½®é”™è¯¯"
-    #error "è¯·å¢žå¤§ WCHNET_NUM_POOL_BUF æˆ– WCHNET_TCP_MSS ä»¥ç¡®ä¿æŽ¥æ”¶ç¼“å†²è¶³å¤Ÿ"
+    #error "WCHNET_NUM_POOL_BUF »ò WCHNET_TCP_MSS ÅäÖÃ´íÎó"
+    #error "ÇëÔö´ó WCHNET_NUM_POOL_BUF »ò WCHNET_TCP_MSS ÒÔÈ·±£½ÓÊÕ»º³å×ã¹»"
 #endif
-/* æ£€æŸ¥ SOCKET æ•°é‡é…ç½® */
+/* ¼ì²é SOCKET ÊýÁ¿ÅäÖÃ */
 #if( WCHNET_NUM_TCP_LISTEN && !WCHNET_NUM_TCP )
-    #error "WCHNET_NUM_TCP é…ç½®é”™è¯¯, è¯·é…ç½® WCHNET_NUM_TCP >= 1"
+    #error "WCHNET_NUM_TCP ÅäÖÃ´íÎó, ÇëÅäÖÃ WCHNET_NUM_TCP >= 1"
 #endif
-/* æ£€æŸ¥å­—èŠ‚å¯¹é½å¿…é¡»ä¸º 4 çš„æ•´æ•°å€ */
+/* ¼ì²é×Ö½Ú¶ÔÆë±ØÐëÎª 4 µÄÕûÊý±¶ */
 #if((WCHNET_MEM_ALIGNMENT % 4) || (WCHNET_MEM_ALIGNMENT == 0))
-    #error "WCHNET_MEM_ALIGNMENT é…ç½®é”™è¯¯, è¯·é…ç½® WCHNET_MEM_ALIGNMENT = 4 * N, N >= 1"
+    #error "WCHNET_MEM_ALIGNMENT ÅäÖÃ´íÎó, ÇëÅäÖÃ WCHNET_MEM_ALIGNMENT = 4 * N, N >= 1"
 #endif
-/* TCP æœ€å¤§æŠ¥æ–‡æ®µé•¿åº¦ */
+/* TCP ×î´ó±¨ÎÄ¶Î³¤¶È */
 #if((WCHNET_TCP_MSS > 1460) || (WCHNET_TCP_MSS < 60))
-    #error "WCHNET_TCP_MSS é…ç½®é”™è¯¯, è¯·é…ç½® WCHNET_TCP_MSS >= 60 && WCHNET_TCP_MSS <= 1460"
+    #error "WCHNET_TCP_MSS ÅäÖÃ´íÎó, ÇëÅäÖÃ WCHNET_TCP_MSS >= 60 && WCHNET_TCP_MSS <= 1460"
 #endif
-/* ARP ç¼“å­˜è¡¨é¡¹æ•° */
+/* ARP »º´æ±íÏîÊý */
 #if((WCHNET_NUM_ARP_TABLE > 0X7F) || (WCHNET_NUM_ARP_TABLE < 1))
-    #error "WCHNET_NUM_ARP_TABLE é…ç½®é”™è¯¯, è¯·é…ç½® WCHNET_NUM_ARP_TABLE >= 1 && WCHNET_NUM_ARP_TABLE <= 0X7F"
+    #error "WCHNET_NUM_ARP_TABLE ÅäÖÃ´íÎó, ÇëÅäÖÃ WCHNET_NUM_ARP_TABLE >= 1 && WCHNET_NUM_ARP_TABLE <= 0X7F"
 #endif
-/* æ£€æŸ¥ POOL BUF é…ç½® */
+/* ¼ì²é POOL BUF ÅäÖÃ */
 #if(WCHNET_NUM_POOL_BUF < 1)
-    #error "WCHNET_NUM_POOL_BUF é…ç½®é”™è¯¯, è¯·é…ç½® WCHNET_NUM_POOL_BUF >= 1"
+    #error "WCHNET_NUM_POOL_BUF ÅäÖÃ´íÎó, ÇëÅäÖÃ WCHNET_NUM_POOL_BUF >= 1"
 #endif
-/* æ£€æŸ¥ PBUF ç»“æž„é…ç½® */
+/* ¼ì²é PBUF ½á¹¹ÅäÖÃ */
 #if(WCHNET_NUM_PBUF < 1)
-    #error "WCHNET_NUM_PBUF é…ç½®é”™è¯¯, è¯·é…ç½® WCHNET_NUM_PBUF >= 1"
+    #error "WCHNET_NUM_PBUF ÅäÖÃ´íÎó, ÇëÅäÖÃ WCHNET_NUM_PBUF >= 1"
 #endif
-/* æ£€æŸ¥ IP åˆ†é…é…ç½® */
+/* ¼ì²é IP ·ÖÅäÅäÖÃ */
 #if(CFG0_IP_REASS_PBUFS && ((WCHNET_NUM_IP_REASSDATA > 10) || (WCHNET_NUM_IP_REASSDATA < 1)))
-    #error "WCHNET_NUM_IP_REASSDATA é…ç½®é”™è¯¯, è¯·é…ç½® WCHNET_NUM_IP_REASSDATA < 10 && WCHNET_NUM_IP_REASSDATA >= 1 "
+    #error "WCHNET_NUM_IP_REASSDATA ÅäÖÃ´íÎó, ÇëÅäÖÃ WCHNET_NUM_IP_REASSDATA < 10 && WCHNET_NUM_IP_REASSDATA >= 1 "
 #endif
-/* æ£€æŸ¥é‡ç»„ IP PBUF çš„æ•°é‡  */
+/* ¼ì²éÖØ×é IP PBUF µÄÊýÁ¿  */
 #if(CFG0_IP_REASS_PBUFS > WCHNET_NUM_POOL_BUF)
-    #error "WCHNET_NUM_POOL_BUF é…ç½®é”™è¯¯, è¯·é…ç½® CFG0_IP_REASS_PBUFS < WCHNET_NUM_POOL_BUF"
+    #error "WCHNET_NUM_POOL_BUF ÅäÖÃ´íÎó, ÇëÅäÖÃ CFG0_IP_REASS_PBUFS < WCHNET_NUM_POOL_BUF"
 #endif
-/* æ£€æŸ¥å®šæ—¶å™¨å‘¨æœŸ, å•ä½ ms  */
+/* ¼ì²é¶¨Ê±Æ÷ÖÜÆÚ, µ¥Î» ms  */
 #if(WCHNETTIMERPERIOD > 50)
-    #error "WCHNETTIMERPERIOD é…ç½®é”™è¯¯, è¯·é…ç½® WCHNETTIMERPERIOD < 50"
+    #error "WCHNETTIMERPERIOD ÅäÖÃ´íÎó, ÇëÅäÖÃ WCHNETTIMERPERIOD < 50"
 #endif
 
-/* é…ç½®å€¼ 0 */
+/* ÅäÖÃÖµ 0 */
 #define WCHNET_MISC_CONFIG0    (((CFG0_TCP_SEND_COPY) << 0) |\
                                ((CFG0_TCP_RECV_COPY)  << 1) |\
                                ((CFG0_TCP_OLD_DELETE) << 2) |\
                                ((CFG0_IP_REASS_PBUFS) << 3) |\
                                ((CFG0_TCP_DEALY_ACK_DISABLE) << 8))
-/* é…ç½®å€¼ 1 */
+/* ÅäÖÃÖµ 1 */
 #define WCHNET_MISC_CONFIG1    (((WCHNET_MAX_SOCKET_NUM)<<0)|\
                                ((WCHNET_PING_ENABLE) << 13) |\
                                ((TCP_RETRY_COUNT)    << 14) |\

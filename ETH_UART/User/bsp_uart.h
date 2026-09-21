@@ -27,7 +27,7 @@
     #define UART_DEBUG(format, ...)
 #endif
 
-#define  UART_USE_FIFO   1  // 1: ä½¿ç”¨ é˜Ÿåˆ—ç®¡ç† å‘é€ 0: ä¸ä½¿ç”¨ é˜Ÿåˆ—ç®¡ç† å‘é€
+#define  UART_USE_FIFO   1  // 1: Ê¹ÓÃ ¶ÓÁÐ¹ÜÀí ·¢ËÍ 0: ²»Ê¹ÓÃ ¶ÓÁÐ¹ÜÀí ·¢ËÍ
 
 /* Global define */
 #define BAUD_RATE   1000000
@@ -39,12 +39,12 @@
 #define UART_RX_DMA_SIZE    600
 #define UART_TX_DMA_SIZE    600
 
-/* åŠå¸§æ»žç•™è¶…æ—¶(ms)ï¼šä¸²å£æŽ¥æ”¶é‡‡ç”¨"å®Œæ•´å¸§æ‰åˆ‡ç¼“å†²æŠ•é€’"ç­–ç•¥ï¼Œ
- * è‹¥å¯¹ç«¯æ–­çº¿/ä¸¢å­—èŠ‚å¯¼è‡´ç¼“å†²å†…é•¿æœŸæ— æ³•æˆå¸§ï¼Œè¶…è¿‡è¯¥æ—¶é—´ç”±ä¸»å¾ªçŽ¯è¯·æ±‚å¼ºåˆ¶å¤ä½ï¼Œ
- * é¿å…æŽ¥æ”¶é€šé“è¢«åŠå¸§æ°¸ä¹…å ç”¨(å–å€¼éœ€ > ä¸€ä¸ªå®Œæ•´å¸§çš„ä¼ è¾“æ—¶é—´)ã€‚ */
+/* °ëÖ¡ÖÍÁô³¬Ê±(ms)£º´®¿Ú½ÓÊÕ²ÉÓÃ"ÍêÕûÖ¡²ÅÇÐ»º³åÍ¶µÝ"²ßÂÔ£¬
+ * Èô¶Ô¶Ë¶ÏÏß/¶ª×Ö½Úµ¼ÖÂ»º³åÄÚ³¤ÆÚÎÞ·¨³ÉÖ¡£¬³¬¹ý¸ÃÊ±¼äÓÉÖ÷Ñ­»·ÇëÇóÇ¿ÖÆ¸´Î»£¬
+ * ±ÜÃâ½ÓÊÕÍ¨µÀ±»°ëÖ¡ÓÀ¾ÃÕ¼ÓÃ(È¡ÖµÐè > Ò»¸öÍêÕûÖ¡µÄ´«ÊäÊ±¼ä)¡£ */
 #define UART_RX_PARTIAL_TIMEOUT_MS   200
 
-/* å…¨å±€ DMA ç¼“å†²åŒºï¼ˆä¾› ISR åŒç¼“å†²åˆ‡æ¢ç›´æŽ¥å¼•ç”¨ï¼‰ */
+/* È«¾Ö DMA »º³åÇø£¨¹© ISR Ë«»º³åÇÐ»»Ö±½ÓÒýÓÃ£© */
 extern u8 UART2_RX_DMA_DataBuf[UART_RX_DMA_SIZE];
 extern u8 UART2_RX_DMA_DataBuf_ALT[UART_RX_DMA_SIZE];
 extern u8 UART2_TX_DMA_DataBuf[UART_TX_DMA_SIZE];
@@ -57,7 +57,7 @@ extern u8 UART2_TX_DMA_DataBuf[UART_TX_DMA_SIZE];
 
 typedef enum { IDLE = 0, BUSY = !IDLE} Uart_TX_DMA_State;
 
-#define NET_LED_ENABLE             0        // ç½‘ç»œLEDä½¿èƒ½æ ‡å¿—
+#define NET_LED_ENABLE             0        // ÍøÂçLEDÊ¹ÄÜ±êÖ¾
 
 #define LED_RX_GPIO_RCC             RCC_APB2Periph_GPIOB
 #define LED_RX_GPIO_TypeDef         GPIOB
@@ -67,10 +67,10 @@ typedef enum { IDLE = 0, BUSY = !IDLE} Uart_TX_DMA_State;
 #define LED_TX_GPIO_TypeDef         GPIOB
 #define LED_TX_GPIO_PIN             GPIO_Pin_12
 
-/* LEDé—ªçƒæ—¶é—´å®šä¹‰ï¼ˆå•ä½ï¼šmsï¼‰ */
-#define LED_RX_BLINK_TIME     20  // æŽ¥æ”¶LEDé—ªçƒå‘¨æœŸï¼ˆç‚¹äº®åŽä¿æŒæ—¶é—´ï¼‰
-#define LED_TX_BLINK_TIME     20  // å‘é€LEDé—ªçƒå‘¨æœŸï¼ˆç‚¹äº®åŽä¿æŒæ—¶é—´ï¼‰
-#define LED_OFF_BLINK_TIME    2  // å‘é€LEDé—ªçƒå‘¨æœŸï¼ˆç†„ç­åŽä¿æŒæ—¶é—´ï¼‰
+/* LEDÉÁË¸Ê±¼ä¶¨Òå£¨µ¥Î»£ºms£© */
+#define LED_RX_BLINK_TIME     20  // ½ÓÊÕLEDÉÁË¸ÖÜÆÚ£¨µãÁÁºó±£³ÖÊ±¼ä£©
+#define LED_TX_BLINK_TIME     20  // ·¢ËÍLEDÉÁË¸ÖÜÆÚ£¨µãÁÁºó±£³ÖÊ±¼ä£©
+#define LED_OFF_BLINK_TIME    2  // ·¢ËÍLEDÉÁË¸ÖÜÆÚ£¨Ï¨Ãðºó±£³ÖÊ±¼ä£©
 
 extern volatile uint32_t g_ulSystemTick;
 void Tick_time_handler(void);
@@ -78,14 +78,14 @@ uint32_t Tick_time_get(void);
 
 #if NET_LED_ENABLE == 1
 
-/* LEDæŽ§åˆ¶å‡½æ•°ï¼ˆä¼˜åŒ–ç‰ˆæœ¬ï¼Œä½¿ç”¨å®šæ—¶å™¨æŽ§åˆ¶é—ªçƒï¼‰ */
-void NEN_RX_LED_SetState(u8 state);       // è®¾ç½®æŽ¥æ”¶LEDçŠ¶æ€ï¼ˆ1=ç‚¹äº®ï¼Œ0=ç†„ç­ï¼‰
-void NEN_TX_LED_SetState(u8 state);       // è®¾ç½®å‘é€LEDçŠ¶æ€ï¼ˆ1=ç‚¹äº®ï¼Œ0=ç†„ç­ï¼‰
-void NEN_RX_LED_Trigger(void);            // è§¦å‘æŽ¥æ”¶LEDé—ªçƒï¼ˆç‚¹äº®åŽè‡ªåŠ¨ç†„ç­ï¼‰
-void NEN_TX_LED_Trigger(void);            // è§¦å‘å‘é€LEDé—ªçƒï¼ˆç‚¹äº®åŽè‡ªåŠ¨ç†„ç­ï¼‰
-void NEN_LED_Update(void);                // LEDå®šæ—¶æ›´æ–°å‡½æ•°ï¼ˆéœ€åœ¨ä¸»å¾ªçŽ¯å‘¨æœŸè°ƒç”¨ï¼‰
+/* LED¿ØÖÆº¯Êý£¨ÓÅ»¯°æ±¾£¬Ê¹ÓÃ¶¨Ê±Æ÷¿ØÖÆÉÁË¸£© */
+void NEN_RX_LED_SetState(u8 state);       // ÉèÖÃ½ÓÊÕLED×´Ì¬£¨1=µãÁÁ£¬0=Ï¨Ãð£©
+void NEN_TX_LED_SetState(u8 state);       // ÉèÖÃ·¢ËÍLED×´Ì¬£¨1=µãÁÁ£¬0=Ï¨Ãð£©
+void NEN_RX_LED_Trigger(void);            // ´¥·¢½ÓÊÕLEDÉÁË¸£¨µãÁÁºó×Ô¶¯Ï¨Ãð£©
+void NEN_TX_LED_Trigger(void);            // ´¥·¢·¢ËÍLEDÉÁË¸£¨µãÁÁºó×Ô¶¯Ï¨Ãð£©
+void NEN_LED_Update(void);                // LED¶¨Ê±¸üÐÂº¯Êý£¨ÐèÔÚÖ÷Ñ­»·ÖÜÆÚµ÷ÓÃ£©
 
-/* ä¿ç•™åŽŸæœ‰å‡½æ•°ä»¥å…¼å®¹æ—§ä»£ç  */
+/* ±£ÁôÔ­ÓÐº¯ÊýÒÔ¼æÈÝ¾É´úÂë */
 void NEN_RX_LED_SET(u8 Val);
 void NEN_TX_LED_SET(u8 Val);
 void NEN_RX_LED_Toggle(void);
@@ -95,157 +95,157 @@ void NEN_TX_LED_Toggle(void);
 
 
 /*********************************************************************
- * æ³¢ç‰¹çŽ‡åŒæ­¥çŠ¶æ€æœºå®šä¹‰
+ * ²¨ÌØÂÊÍ¬²½×´Ì¬»ú¶¨Òå
  */
 typedef enum {
 
-    BAUD_SYNC_STATE_INIT = 0,           /* åˆå§‹åŒ–ï¼šè£…è½½æœ€é«˜æ¡£æ³¢ç‰¹çŽ‡ï¼Œä½œä¸ºé™æ¡£æ‰«æèµ·ç‚¹ */
-    BAUD_SYNC_STATE_APPLY_RATE,         /* åº”ç”¨å½“å‰æ¡£æ³¢ç‰¹çŽ‡åˆ°ç¡¬ä»¶å¹¶ç­‰å¾…é“¾è·¯ç¨³å®š */
-    BAUD_SYNC_STATE_SEND_SYNC_05,       /* æ¡æ‰‹â‘ ï¼šåŒæ­¥æŽ¢æµ‹å¸§ 0x05 */
-    BAUD_SYNC_STATE_SEND_00E0202,       /* å‘é€æµ‹è¯•å¸§ \STX00E0202\ETX6C          \STX015F\ETXDF */
-    BAUD_SYNC_STATE_SEND_00ECA02,       /* å‘é€æµ‹è¯•å¸§ \STX00ECA02\ETX8E          \STXC13F\ETXF0 */
-    BAUD_SYNC_STATE_SEND_E000EE8,       /* å‘é€æµ‹è¯•å¸§ \STXE000EE804\ETXFE        \STXFDE8519B\ETXEB */
+    BAUD_SYNC_STATE_INIT = 0,           /* ³õÊ¼»¯£º×°ÔØ×î¸ßµµ²¨ÌØÂÊ£¬×÷Îª½µµµÉ¨ÃèÆðµã */
+    BAUD_SYNC_STATE_APPLY_RATE,         /* Ó¦ÓÃµ±Ç°µµ²¨ÌØÂÊµ½Ó²¼þ²¢µÈ´ýÁ´Â·ÎÈ¶¨ */
+    BAUD_SYNC_STATE_SEND_SYNC_05,       /* ÎÕÊÖ¢Ù£ºÍ¬²½Ì½²âÖ¡ 0x05 */
+    BAUD_SYNC_STATE_SEND_00E0202,       /* ·¢ËÍ²âÊÔÖ¡ \STX00E0202\ETX6C          \STX015F\ETXDF */
+    BAUD_SYNC_STATE_SEND_00ECA02,       /* ·¢ËÍ²âÊÔÖ¡ \STX00ECA02\ETX8E          \STXC13F\ETXF0 */
+    BAUD_SYNC_STATE_SEND_E000EE8,       /* ·¢ËÍ²âÊÔÖ¡ \STXE000EE804\ETXFE        \STXFDE8519B\ETXEB */
     //    02 45 31 30 30 45 45 43 30 34 36 38 37 32 32 35 37 39 03 42 38
-    BAUD_SYNC_STATE_SEND_E100EEC,       /* æ¡æ‰‹â‘¤(ç»ˆåˆ¤)ï¼š\STXE100EEC04EDB17066\ETXD9 é€šè¿‡å³å‘½ä¸­ */
+    BAUD_SYNC_STATE_SEND_E100EEC,       /* ÎÕÊÖ¢Ý(ÖÕÅÐ)£º\STXE100EEC04EDB17066\ETXD9 Í¨¹ý¼´ÃüÖÐ */
 
-    BAUD_SYNC_STATE_SCAN_NEXT,          /* é™æ¡£ï¼šæ¡£ä½ç´¢å¼•-1ï¼Œåº”ç”¨ä¸‹ä¸€æ¡£åŽé‡æ–°æ¡æ‰‹ */
-    BAUD_SYNC_STATE_ROUND_END,          /* æœ¬è½®æ‰«æç»“æŸï¼šæ•´è½®é‡æ‰« æˆ– åˆ¤å®šå¤±è´¥ */
+    BAUD_SYNC_STATE_SCAN_NEXT,          /* ½µµµ£ºµµÎ»Ë÷Òý-1£¬Ó¦ÓÃÏÂÒ»µµºóÖØÐÂÎÕÊÖ */
+    BAUD_SYNC_STATE_ROUND_END,          /* ±¾ÂÖÉ¨Ãè½áÊø£ºÕûÂÖÖØÉ¨ »ò ÅÐ¶¨Ê§°Ü */
 
-    BAUD_SYNC_STATE_SUCCESS,            /* åŒæ­¥æˆåŠŸ */
-    BAUD_SYNC_STATE_FAILED              /* åŒæ­¥å¤±è´¥ */
+    BAUD_SYNC_STATE_SUCCESS,            /* Í¬²½³É¹¦ */
+    BAUD_SYNC_STATE_FAILED              /* Í¬²½Ê§°Ü */
 
 } BaudSyncState_t;
 
-/* æ³¢ç‰¹çŽ‡åŒæ­¥çŠ¶æ€æœºä¸Šä¸‹æ–‡ */
+/* ²¨ÌØÂÊÍ¬²½×´Ì¬»úÉÏÏÂÎÄ */
 typedef struct {
-    BaudSyncState_t state;              /* å½“å‰çŠ¶æ€ */
-    uint8_t scan_index;                 /* å½“å‰æ‰«ææ¡£ä½ç´¢å¼•(ä»Žæœ€é«˜æ¡£å‘æœ€ä½Žæ¡£é€’å‡) */
-    uint8_t fail_count;                 /* æœ¬è½®æ‰«æä¸­å·²å¤±è´¥çš„æ¡£ä½æ•°(æ—¥å¿—ç”¨) */
-    uint8_t apply_retry;                /* ç¡¬ä»¶åˆ‡æ¡£é‡è¯•è®¡æ•°(ä¸²å£å¿™æ—¶) */
-    uint8_t scan_round;                 /* å·²å®Œæˆçš„æ•´è½®æ‰«ææ¬¡æ•°(é”™è¯¯æ¢å¤ç”¨) */
-    uint8_t is_sync_flag;               /* åŒæ­¥ç»“æžœæ ‡å¿— 1=å·²é”å®šæˆåŠŸ */
-    uint32_t baudrate;                  /* å½“å‰ç”Ÿæ•ˆçš„æ³¢ç‰¹çŽ‡ */
+    BaudSyncState_t state;              /* µ±Ç°×´Ì¬ */
+    uint8_t scan_index;                 /* µ±Ç°É¨ÃèµµÎ»Ë÷Òý(´Ó×î¸ßµµÏò×îµÍµµµÝ¼õ) */
+    uint8_t fail_count;                 /* ±¾ÂÖÉ¨ÃèÖÐÒÑÊ§°ÜµÄµµÎ»Êý(ÈÕÖ¾ÓÃ) */
+    uint8_t apply_retry;                /* Ó²¼þÇÐµµÖØÊÔ¼ÆÊý(´®¿ÚÃ¦Ê±) */
+    uint8_t scan_round;                 /* ÒÑÍê³ÉµÄÕûÂÖÉ¨Ãè´ÎÊý(´íÎó»Ö¸´ÓÃ) */
+    uint8_t is_sync_flag;               /* Í¬²½½á¹û±êÖ¾ 1=ÒÑËø¶¨³É¹¦ */
+    uint32_t baudrate;                  /* µ±Ç°ÉúÐ§µÄ²¨ÌØÂÊ */
 
 } BaudSyncContext_t;
 
-#define BAUD_SYNC_TIMEOUT_MS             150     /* æ¡æ‰‹å¸§ç­‰å¾…å›žåº”è¶…æ—¶ [ms] */
-#define BAUD_SYNC_PROBE_TIMEOUT_MS       80      /* 0x05 æŽ¢æµ‹å¸§è¶…æ—¶ [ms] (PLCåœ¨çº¿æ—¶é€šå¸¸<10msåº”ç­”) */
-#define BAUD_SYNC_DELAY_MS               10      /* åˆ‡æ¢æ³¢ç‰¹çŽ‡åŽçš„ç¨³å®šå»¶æ—¶ [ms] */
-#define BAUD_SYNC_MAX_RETRY              2       /* æ¡æ‰‹å¸§æœ€å¤§é‡è¯•æ¬¡æ•° */
-#define BAUD_SYNC_PROBE_MAX_RETRY        2       /* æŽ¢æµ‹å¸§æœ€å¤§é‡è¯•æ¬¡æ•° */
-#define BAUD_SYNC_APPLY_MAX_RETRY        3       /* ç¡¬ä»¶åˆ‡æ¡£å¤±è´¥(ä¸²å£å¿™)æœ€å¤§é‡è¯•æ¬¡æ•° */
-#define BAUD_SYNC_SCAN_ROUND_MAX         3       /* æ•´è½®é™æ¡£æ‰«ææœ€å¤§é‡å¤æ¬¡æ•° */
-#define BAUD_SYNC_FALLBACK_BAUD          9600    /* å…¨éƒ¨æ¡£ä½å¤±è´¥åŽçš„å…œåº•æ³¢ç‰¹çŽ‡ */
-#define BAUD_SYNC_RESET_ON_ALL_FAILED    0       /* 1=å…œåº•åŽå¤ä½é‡è¯•(åŽŸè¡Œä¸º) 0=è¿”å›ž-1äº¤ä¸Šå±‚ */
+#define BAUD_SYNC_TIMEOUT_MS             150     /* ÎÕÊÖÖ¡µÈ´ý»ØÓ¦³¬Ê± [ms] */
+#define BAUD_SYNC_PROBE_TIMEOUT_MS       80      /* 0x05 Ì½²âÖ¡³¬Ê± [ms] (PLCÔÚÏßÊ±Í¨³£<10msÓ¦´ð) */
+#define BAUD_SYNC_DELAY_MS               10      /* ÇÐ»»²¨ÌØÂÊºóµÄÎÈ¶¨ÑÓÊ± [ms] */
+#define BAUD_SYNC_MAX_RETRY              2       /* ÎÕÊÖÖ¡×î´óÖØÊÔ´ÎÊý */
+#define BAUD_SYNC_PROBE_MAX_RETRY        2       /* Ì½²âÖ¡×î´óÖØÊÔ´ÎÊý */
+#define BAUD_SYNC_APPLY_MAX_RETRY        3       /* Ó²¼þÇÐµµÊ§°Ü(´®¿ÚÃ¦)×î´óÖØÊÔ´ÎÊý */
+#define BAUD_SYNC_SCAN_ROUND_MAX         3       /* ÕûÂÖ½µµµÉ¨Ãè×î´óÖØ¸´´ÎÊý */
+#define BAUD_SYNC_FALLBACK_BAUD          9600    /* È«²¿µµÎ»Ê§°ÜºóµÄ¶µµ×²¨ÌØÂÊ */
+#define BAUD_SYNC_RESET_ON_ALL_FAILED    0       /* 1=¶µµ×ºó¸´Î»ÖØÊÔ(Ô­ÐÐÎª) 0=·µ»Ø-1½»ÉÏ²ã */
 
-/* â”€â”€â”€ å‘é€è¯·æ±‚é˜Ÿåˆ—èŠ‚ç‚¹: åŒ…å«å‘é€æ•°æ®å’Œè¯·æ±‚ä¸Šä¸‹æ–‡ï¼Œå½¢æˆé—­çŽ¯æ•°æ®æµ â”€â”€â”€ */
-/* è®¾è®¡ç†å¿µ: å‘é€å…¥é˜Ÿä¿å­˜æ•°æ®ï¼ŒæŽ¥æ”¶å‡ºé˜Ÿè§£æžæ•°æ®ï¼Œä¿è¯è¯·æ±‚-å“åº”é…å¯¹æ­£ç¡® */
-#define UART_REQ_QUEUE_SIZE     80                                      /* é˜Ÿåˆ—æ·±åº¦(è¯·æ±‚æ•°, éž2çš„å¹‚, ç”¨å–æ¨¡è¿ç®—) */
-#define UART_REQ_DATA_MAX_LEN   600                                     /* å•è¯·æ±‚æœ€å¤§æ•°æ®é•¿åº¦(å…¥é˜Ÿæˆªæ–­ä¸Šé™, å…¼å®¹æ—§å€¼) */
-#define UART_REQ_RING_CAP       2048                                    /* å…±äº«å‘é€æ•°æ®çŽ¯å½¢å­˜å‚¨æ± å®¹é‡(å­—èŠ‚, å¿…é¡»ä¸º2çš„å¹‚ä¾¿äºŽ&å›žç»•) */
+/* ©¤©¤©¤ ·¢ËÍÇëÇó¶ÓÁÐ½Úµã: °üº¬·¢ËÍÊý¾ÝºÍÇëÇóÉÏÏÂÎÄ£¬ÐÎ³É±Õ»·Êý¾ÝÁ÷ ©¤©¤©¤ */
+/* Éè¼ÆÀíÄî: ·¢ËÍÈë¶Ó±£´æÊý¾Ý£¬½ÓÊÕ³ö¶Ó½âÎöÊý¾Ý£¬±£Ö¤ÇëÇó-ÏìÓ¦Åä¶ÔÕýÈ· */
+#define UART_REQ_QUEUE_SIZE     80                                      /* ¶ÓÁÐÉî¶È(ÇëÇóÊý, ·Ç2µÄÃÝ, ÓÃÈ¡Ä£ÔËËã) */
+#define UART_REQ_DATA_MAX_LEN   600                                     /* µ¥ÇëÇó×î´óÊý¾Ý³¤¶È(Èë¶Ó½Ø¶ÏÉÏÏÞ, ¼æÈÝ¾ÉÖµ) */
+#define UART_REQ_RING_CAP       2048                                    /* ¹²Ïí·¢ËÍÊý¾Ý»·ÐÎ´æ´¢³ØÈÝÁ¿(×Ö½Ú, ±ØÐëÎª2µÄÃÝ±ãÓÚ&»ØÈÆ) */
 
 typedef struct {
-    uint16_t data_off;                     /* æ•°æ®åœ¨çŽ¯å½¢ç¼“å†² ring ä¸­çš„åç§» */
-    uint16_t data_len;                     /* å®žé™…æ•°æ®é•¿åº¦ */
+    uint16_t data_off;                     /* Êý¾ÝÔÚ»·ÐÎ»º³å ring ÖÐµÄÆ«ÒÆ */
+    uint16_t data_len;                     /* Êµ¼ÊÊý¾Ý³¤¶È */
     
-    /* è¯·æ±‚ä¸Šä¸‹æ–‡å¿«ç…§: æŽ¥æ”¶æ—¶ç”¨äºŽè·¯ç”±å“åº” */
-    uint8_t  Sour_Sockid;                  /* æºsocket IDï¼ˆå®¢æˆ·ç«¯socketï¼‰ */
-    uint8_t  Dest_Sockid;                  /* ç›®æ ‡socket IDï¼ˆæœåŠ¡å™¨socketï¼‰ */
-    NET_MC_Recv_Resp_t mc_meta;            /* MCåè®®ä¸Šä¸‹æ–‡ */
-    uint32_t eth_seq_num;                  /* è¯·æ±‚åºå· */
+    /* ÇëÇóÉÏÏÂÎÄ¿ìÕÕ: ½ÓÊÕÊ±ÓÃÓÚÂ·ÓÉÏìÓ¦ */
+    uint8_t  Sour_Sockid;                  /* Ô´socket ID£¨¿Í»§¶Ësocket£© */
+    uint8_t  Dest_Sockid;                  /* Ä¿±êsocket ID£¨·þÎñÆ÷socket£© */
+    NET_MC_Recv_Resp_t mc_meta;            /* MCÐ­ÒéÉÏÏÂÎÄ */
+    uint32_t eth_seq_num;                  /* ÇëÇóÐòºÅ */
     
-    /* å‘é€æŽ§åˆ¶ä¿¡æ¯ */
-    uint32_t send_time;                     /* å‘é€æ—¶é—´æˆ³ï¼ˆç”¨äºŽè¶…æ—¶æ£€æµ‹ï¼‰ */
-    uint8_t  retry_count;                   /* å½“å‰é‡è¯•æ¬¡æ•° */
+    /* ·¢ËÍ¿ØÖÆÐÅÏ¢ */
+    uint32_t send_time;                     /* ·¢ËÍÊ±¼ä´Á£¨ÓÃÓÚ³¬Ê±¼ì²â£© */
+    uint8_t  retry_count;                   /* µ±Ç°ÖØÊÔ´ÎÊý */
 } uart_req_queue_node_t;
 
-/* çŽ¯å½¢é˜Ÿåˆ—ç®¡ç†: O(1) å…¥é˜Ÿ/å‡ºé˜Ÿæ“ä½œ */
+/* »·ÐÎ¶ÓÁÐ¹ÜÀí: O(1) Èë¶Ó/³ö¶Ó²Ù×÷ */
 typedef struct {
-    uart_req_queue_node_t nodes[UART_REQ_QUEUE_SIZE]; /* é˜Ÿåˆ—èŠ‚ç‚¹æ•°ç»„ */
-    uint8_t head;                                      /* å¤´æŒ‡é’ˆ(å‡ºé˜Ÿä½ç½®) */
-    uint8_t tail;                                      /* å°¾æŒ‡é’ˆ(å…¥é˜Ÿä½ç½®) */
-    uint16_t count;                                    /* å½“å‰é˜Ÿåˆ—é•¿åº¦ï¼ˆä½¿ç”¨uint16_té˜²æ­¢æº¢å‡ºï¼‰ */
-    uint8_t  ring[UART_REQ_RING_CAP];                  /* å…±äº«å‘é€æ•°æ®çŽ¯å½¢å­˜å‚¨æ± (æ›¿ä»£æ¯èŠ‚ç‚¹600å­—èŠ‚) */
-    uint16_t ring_wp;                                  /* çŽ¯å½¢å†™å…¥ä½ç½®(å·²ç”¨è®¡æ•°æ³•, æ— éœ€ç‹¬ç«‹è¯»æŒ‡é’ˆ) */
-    uint16_t ring_used;                                /* çŽ¯å½¢å·²ç”¨å­—èŠ‚æ•°(ç”¨äºŽåˆ¤æ»¡) */
+    uart_req_queue_node_t nodes[UART_REQ_QUEUE_SIZE]; /* ¶ÓÁÐ½ÚµãÊý×é */
+    uint8_t head;                                      /* Í·Ö¸Õë(³ö¶ÓÎ»ÖÃ) */
+    uint8_t tail;                                      /* Î²Ö¸Õë(Èë¶ÓÎ»ÖÃ) */
+    uint16_t count;                                    /* µ±Ç°¶ÓÁÐ³¤¶È£¨Ê¹ÓÃuint16_t·ÀÖ¹Òç³ö£© */
+    uint8_t  ring[UART_REQ_RING_CAP];                  /* ¹²Ïí·¢ËÍÊý¾Ý»·ÐÎ´æ´¢³Ø(Ìæ´úÃ¿½Úµã600×Ö½Ú) */
+    uint16_t ring_wp;                                  /* »·ÐÎÐ´ÈëÎ»ÖÃ(ÒÑÓÃ¼ÆÊý·¨, ÎÞÐè¶ÀÁ¢¶ÁÖ¸Õë) */
+    uint16_t ring_used;                                /* »·ÐÎÒÑÓÃ×Ö½ÚÊý(ÓÃÓÚÅÐÂú) */
 
-    /* â”€â”€â”€ è¯·æ±‚åºå·ç®¡ç†(åŽŸä¸ºæ–‡ä»¶çº§å…¨å±€å˜é‡, ç»Ÿä¸€æ”¶å½’é˜Ÿåˆ—ç»“æž„ä½“) â”€â”€â”€ */
-    uint32_t seq_counter;                              /* è¯·æ±‚åºå·ç”Ÿæˆå™¨: æ¯æ¬¡å…¥é˜Ÿå‰ +1, å…¨ç¨‹å•è°ƒé€’å¢ž,
-                                                        * ç”± uartTxWithSocketID å–ç”¨ã€‚
-                                                        * æ³¨æ„: ä¸éšé˜Ÿåˆ—æ¸…ç©º/é‡è¿žè€Œå¤ä½(è§ uart_req_queue_init) */
-    volatile uint32_t last_enq_seq;                    /* æœ€è¿‘ä¸€æ¬¡å…¥é˜Ÿçš„è¯·æ±‚åºå·(0=ä»Žæœªå…¥é˜Ÿ)ã€‚
-                                                        * å…¥é˜Ÿæ˜¯å…¨é¡¹ç›®ä¸²å£è¯·æ±‚çš„å”¯ä¸€å…¥å£ï¼Œæ•…è¯¥å€¼æ’ä¸º
-                                                        * "åˆšåˆšä¸‹å‘çš„é‚£æ¡ä¸²å£å‘½ä»¤"çš„åºå·ã€‚ä¸Šå±‚åè®®æ¨¡å—
-                                                        * (å¦‚ Modbus ä»Žç«™)åœ¨ç™»è®°äº‹åŠ¡æ—¶è®°å½•å®ƒï¼Œå“åº”åˆ°è¾¾æ—¶
-                                                        * ä¸Ž uart_rx_ctx.eth_seq_num æ¯”å¯¹ï¼Œå³å¯æ‹’ç»
-                                                        * è¿Ÿåˆ°/é‡å¤å“åº”è¢«ç®—åˆ°å½“å‰äº‹åŠ¡ä¸Šã€‚ */
+    /* ©¤©¤©¤ ÇëÇóÐòºÅ¹ÜÀí(Ô­ÎªÎÄ¼þ¼¶È«¾Ö±äÁ¿, Í³Ò»ÊÕ¹é¶ÓÁÐ½á¹¹Ìå) ©¤©¤©¤ */
+    uint32_t seq_counter;                              /* ÇëÇóÐòºÅÉú³ÉÆ÷: Ã¿´ÎÈë¶ÓÇ° +1, È«³Ìµ¥µ÷µÝÔö,
+                                                        * ÓÉ uartTxWithSocketID È¡ÓÃ¡£
+                                                        * ×¢Òâ: ²»Ëæ¶ÓÁÐÇå¿Õ/ÖØÁ¬¶ø¸´Î»(¼û uart_req_queue_init) */
+    volatile uint32_t last_enq_seq;                    /* ×î½üÒ»´ÎÈë¶ÓµÄÇëÇóÐòºÅ(0=´ÓÎ´Èë¶Ó)¡£
+                                                        * Èë¶ÓÊÇÈ«ÏîÄ¿´®¿ÚÇëÇóµÄÎ¨Ò»Èë¿Ú£¬¹Ê¸ÃÖµºãÎª
+                                                        * "¸Õ¸ÕÏÂ·¢µÄÄÇÌõ´®¿ÚÃüÁî"µÄÐòºÅ¡£ÉÏ²ãÐ­ÒéÄ£¿é
+                                                        * (Èç Modbus ´ÓÕ¾)ÔÚµÇ¼ÇÊÂÎñÊ±¼ÇÂ¼Ëü£¬ÏìÓ¦µ½´ïÊ±
+                                                        * Óë uart_rx_ctx.eth_seq_num ±È¶Ô£¬¼´¿É¾Ü¾ø
+                                                        * ³Ùµ½/ÖØ¸´ÏìÓ¦±»Ëãµ½µ±Ç°ÊÂÎñÉÏ¡£ */
 } uart_req_queue_t;
 
-/* é˜Ÿåˆ—æ“ä½œæŽ¥å£å£°æ˜Ž */
-void        uart_req_queue_init(void);                                 /* é˜Ÿåˆ—åˆå§‹åŒ– */
-uint8_t     uart_req_queue_is_empty(void);                             /* é˜Ÿåˆ—æ˜¯å¦ä¸ºç©º */
-uint8_t     uart_req_queue_is_full(void);                              /* é˜Ÿåˆ—æ˜¯å¦å·²æ»¡ */
+/* ¶ÓÁÐ²Ù×÷½Ó¿ÚÉùÃ÷ */
+void        uart_req_queue_init(void);                                 /* ¶ÓÁÐ³õÊ¼»¯ */
+uint8_t     uart_req_queue_is_empty(void);                             /* ¶ÓÁÐÊÇ·ñÎª¿Õ */
+uint8_t     uart_req_queue_is_full(void);                              /* ¶ÓÁÐÊÇ·ñÒÑÂú */
 int         uart_req_queue_enqueue(uint8_t Sour_Sockid, uint8_t Dest_Sockid,
                                    NET_MC_Recv_Resp_t *mc_meta, uint32_t eth_seq_num,
-                                   uint8_t *data, uint16_t len);        /* å…¥é˜Ÿ */
-uart_req_queue_node_t* uart_req_queue_front(void);                     /* èŽ·å–é˜Ÿé¦–(ä¸åˆ é™¤) */
-void        uart_req_queue_dequeue(void);                              /* å‡ºé˜Ÿ(åˆ é™¤é˜Ÿé¦–) */
-void        uart_req_queue_clear(void);                                /* æ¸…ç©ºé˜Ÿåˆ— */
-uart_req_queue_node_t* uart_req_queue_peek_tail(void);                 /* èŽ·å–é˜Ÿå°¾(ä¸‹ä¸€ä¸ªå…¥é˜Ÿä½ç½®) */
+                                   uint8_t *data, uint16_t len);        /* Èë¶Ó */
+uart_req_queue_node_t* uart_req_queue_front(void);                     /* »ñÈ¡¶ÓÊ×(²»É¾³ý) */
+void        uart_req_queue_dequeue(void);                              /* ³ö¶Ó(É¾³ý¶ÓÊ×) */
+void        uart_req_queue_clear(void);                                /* Çå¿Õ¶ÓÁÐ */
+uart_req_queue_node_t* uart_req_queue_peek_tail(void);                 /* »ñÈ¡¶ÓÎ²(ÏÂÒ»¸öÈë¶ÓÎ»ÖÃ) */
 
-/* â”€â”€â”€ ä¸²å£æŽ¥æ”¶è§£æžä¸Šä¸‹æ–‡: åˆ†ç¦»è‡ª uart_data_tï¼Œä»…ç”¨äºŽä¸²å£æ•°æ®è§£æžâ†’ç½‘å£è·¯ç”± â”€â”€â”€ */
-/* è®¾è®¡æ„å›¾: ä¸Ž uart_mc_meta åŒçº§ï¼Œèšç„¦ socket è·¯ç”±ä¿¡æ¯ï¼Œä¸å— uartSendNextPacket è¦†å†™å¹²æ‰° */
+/* ©¤©¤©¤ ´®¿Ú½ÓÊÕ½âÎöÉÏÏÂÎÄ: ·ÖÀë×Ô uart_data_t£¬½öÓÃÓÚ´®¿ÚÊý¾Ý½âÎö¡úÍø¿ÚÂ·ÓÉ ©¤©¤©¤ */
+/* Éè¼ÆÒâÍ¼: Óë uart_mc_meta Í¬¼¶£¬¾Û½¹ socket Â·ÓÉÐÅÏ¢£¬²»ÊÜ uartSendNextPacket ¸²Ð´¸ÉÈÅ */
 typedef struct {
-    uint8_t  Sour_Sockid;               /* æºsocket IDï¼ˆå®¢æˆ·ç«¯socketï¼‰ */
-    uint8_t  Dest_Sockid;               /* ç›®æ ‡socket IDï¼ˆæœåŠ¡å™¨socketï¼‰ */
-    uint32_t eth_seq_num;               /* å½“å‰ ETH åˆ°è¾¾åºå· */
+    uint8_t  Sour_Sockid;               /* Ô´socket ID£¨¿Í»§¶Ësocket£© */
+    uint8_t  Dest_Sockid;               /* Ä¿±êsocket ID£¨·þÎñÆ÷socket£© */
+    uint32_t eth_seq_num;               /* µ±Ç° ETH µ½´ïÐòºÅ */
 } uart_rx_ctx_t;
 
-extern uart_rx_ctx_t uart_rx_ctx;      /* ä¸²å£è§£æžè·¯ç”±ä¸Šä¸‹æ–‡ (ä¸Ž uart_mc_meta åŒçº§åˆ†ç¦») */
+extern uart_rx_ctx_t uart_rx_ctx;      /* ´®¿Ú½âÎöÂ·ÓÉÉÏÏÂÎÄ (Óë uart_mc_meta Í¬¼¶·ÖÀë) */
 
-/* UART ç¡¬ä»¶/DMA/é˜Ÿåˆ—å…ƒæ•°æ® (MCåè®®ä¸Šä¸‹æ–‡å·²åˆ†ç¦»ä¸º net_mc_meta/uart_mc_meta) */
+/* UART Ó²¼þ/DMA/¶ÓÁÐÔªÊý¾Ý (MCÐ­ÒéÉÏÏÂÎÄÒÑ·ÖÀëÎª net_mc_meta/uart_mc_meta) */
 struct uart_data
 {
-    uint8_t rx_status;                  /* æŽ¥æ”¶çŠ¶æ€ */
-    uint8_t tx_status;                  /* å‘é€çŠ¶æ€ */
-    volatile uint8_t dma_tx_busy;       /* TX DMA å¿™æ ‡å¿—(åŽŸä¸ºå…¨å±€å˜é‡, ç»Ÿä¸€æ”¶å½’æœ¬ç»“æž„ä½“):
-                                         * uartStartDmaTransfer ç½®1 â†’ DMA1_Channel7 ISR æ¸…0ã€‚
-                                         * è½¯ä»¶æ ‡å¿—æ¶ˆé™¤äº†"ä»…æŸ¥ CNTR/TC å¯„å­˜å™¨"çš„æ—¶åºçª—å£ã€‚ */
-    uint8_t rx_buf_idx;                 /* å½“å‰DMAæ´»è·ƒç¼“å­˜ç´¢å¼•: 0=rx_buf, 1=rx_buf_alt */
-    uint8_t *tx_buf;                    /* å‘é€ç¼“å­˜ */
-    uint16_t tx_buf_size;               /* å‘é€ç¼“å­˜å¤§å° */
-    uint8_t *rx_buf;                    /* å½“å‰DMAæŽ¥æ”¶ç¼“å­˜ */
-    uint8_t *rx_buf_alt;                /* å¤‡ç”¨DMAæŽ¥æ”¶ç¼“å­˜ï¼ˆåŒç¼“å†²ï¼‰ */
-    uint16_t rx_buf_size;               /* æŽ¥æ”¶ç¼“å­˜å¤§å° */
-    uint16_t last_size;                 /* ä¸Šä¸€æ¬¡æŽ¥æ”¶çš„å¤§å° */
+    uint8_t rx_status;                  /* ½ÓÊÕ×´Ì¬ */
+    uint8_t tx_status;                  /* ·¢ËÍ×´Ì¬ */
+    volatile uint8_t dma_tx_busy;       /* TX DMA Ã¦±êÖ¾(Ô­ÎªÈ«¾Ö±äÁ¿, Í³Ò»ÊÕ¹é±¾½á¹¹Ìå):
+                                         * uartStartDmaTransfer ÖÃ1 ¡ú DMA1_Channel7 ISR Çå0¡£
+                                         * Èí¼þ±êÖ¾Ïû³ýÁË"½ö²é CNTR/TC ¼Ä´æÆ÷"µÄÊ±Ðò´°¿Ú¡£ */
+    uint8_t rx_buf_idx;                 /* µ±Ç°DMA»îÔ¾»º´æË÷Òý: 0=rx_buf, 1=rx_buf_alt */
+    uint8_t *tx_buf;                    /* ·¢ËÍ»º´æ */
+    uint16_t tx_buf_size;               /* ·¢ËÍ»º´æ´óÐ¡ */
+    uint8_t *rx_buf;                    /* µ±Ç°DMA½ÓÊÕ»º´æ */
+    uint8_t *rx_buf_alt;                /* ±¸ÓÃDMA½ÓÊÕ»º´æ£¨Ë«»º³å£© */
+    uint16_t rx_buf_size;               /* ½ÓÊÕ»º´æ´óÐ¡ */
+    uint16_t last_size;                 /* ÉÏÒ»´Î½ÓÊÕµÄ´óÐ¡ */
 
-    uint16_t timeout_ms;                /* è¶…æ—¶æ—¶é—´ï¼ˆæ¯«ç§’ï¼‰ */
-    uint16_t max_retry;                 /* æœ€å¤§é‡è¯•æ¬¡æ•° */
-    uint16_t retry_count;               /* å½“å‰é‡è¯•æ¬¡æ•° */
-    uint32_t send_len;                  /* å‘é€é•¿åº¦ */
-    uint32_t send_time;                 /* å‘é€æ—¶é—´æˆ³ */
+    uint16_t timeout_ms;                /* ³¬Ê±Ê±¼ä£¨ºÁÃë£© */
+    uint16_t max_retry;                 /* ×î´óÖØÊÔ´ÎÊý */
+    uint16_t retry_count;               /* µ±Ç°ÖØÊÔ´ÎÊý */
+    uint32_t send_len;                  /* ·¢ËÍ³¤¶È */
+    uint32_t send_time;                 /* ·¢ËÍÊ±¼ä´Á */
 
-    USART_TypeDef  *huart;              /* ä¸²å£å¥æŸ„ */
-    DMA_Channel_TypeDef* hdma_tx;       /* å‘é€DMAé€šé“ */
-    DMA_Channel_TypeDef* hdma_rx;       /* æŽ¥æ”¶DMAé€šé“ */
+    USART_TypeDef  *huart;              /* ´®¿Ú¾ä±ú */
+    DMA_Channel_TypeDef* hdma_tx;       /* ·¢ËÍDMAÍ¨µÀ */
+    DMA_Channel_TypeDef* hdma_rx;       /* ½ÓÊÕDMAÍ¨µÀ */
     
-    uart_req_queue_t req_queue;         /* æ–°çš„å‘é€è¯·æ±‚é˜Ÿåˆ—(é—­çŽ¯æ•°æ®æµ) */
+    uart_req_queue_t req_queue;         /* ÐÂµÄ·¢ËÍÇëÇó¶ÓÁÐ(±Õ»·Êý¾ÝÁ÷) */
     
-    /* â”€â”€â”€ ISRâ†’ä¸»å¾ªçŽ¯ å»¶è¿Ÿå¤„ç†ï¼šå¸§è§£æžä»ŽISRç§»åˆ°ä¸»å¾ªçŽ¯ â”€â”€â”€ */
-    uint8_t *pending_rx_buf;            /* ISRå†™å…¥: å¾…å¤„ç†çš„æŽ¥æ”¶æ•°æ®æŒ‡é’ˆ */
-    uint16_t pending_rx_len;            /* ISRå†™å…¥: å¾…å¤„ç†çš„æŽ¥æ”¶æ•°æ®é•¿åº¦ */
-    volatile uint8_t rx_pending;        /* ISRç½®1: æœ‰å¾…å¤„ç†çš„æŽ¥æ”¶æ•°æ® */
+    /* ©¤©¤©¤ ISR¡úÖ÷Ñ­»· ÑÓ³Ù´¦Àí£ºÖ¡½âÎö´ÓISRÒÆµ½Ö÷Ñ­»· ©¤©¤©¤ */
+    uint8_t *pending_rx_buf;            /* ISRÐ´Èë: ´ý´¦ÀíµÄ½ÓÊÕÊý¾ÝÖ¸Õë */
+    uint16_t pending_rx_len;            /* ISRÐ´Èë: ´ý´¦ÀíµÄ½ÓÊÕÊý¾Ý³¤¶È */
+    volatile uint8_t rx_pending;        /* ISRÖÃ1: ÓÐ´ý´¦ÀíµÄ½ÓÊÕÊý¾Ý */
 
-    /* â”€â”€â”€ æŽ¥æ”¶åŠå¸§ç´¯ç§¯çŠ¶æ€("å®Œæ•´å¸§æ‰åˆ‡ç¼“å†²æŠ•é€’") â”€â”€â”€
-     * ä¸²å£åº”ç­”å¯èƒ½è¢« IDLE ä¸­æ–­åˆ‡æˆå¤šç‰‡(å¯¹ç«¯å¸§å†…åœé¡¿)ï¼Œ
-     * æ•… ISR ä»…åœ¨ç¼“å†²å†…æž„æˆå®Œæ•´å¸§æ—¶æ‰åˆ‡ç¼“å†²æŠ•é€’ï¼Œå¦åˆ™ä¿æŒ DMA ç»§ç»­å‘
-     * åŒä¸€ç¼“å†²è¿½åŠ ï¼Œä»Žæ ¹ä¸Šæ¶ˆé™¤"åŠå¸§"æµå…¥è§£æžå±‚ã€‚ */
-    volatile uint8_t  rx_part_active;   /* ISRç½®1: å½“å‰ç¼“å†²å·²ç´¯ç§¯ä½†å°šæœªæˆå¸§ */
-    volatile uint32_t rx_part_tick;     /* ISRå†™å…¥: åŠå¸§èµ·å§‹æ—¶åˆ»(ms)ï¼Œä¾›æ»žç•™çœ‹é—¨ç‹—åˆ¤å®š */
-    volatile uint8_t  rx_part_reset;    /* ä¸»å¾ªçŽ¯ç½®1: è¯·æ±‚ISRä¸¢å¼ƒåŠå¸§å¹¶å¼ºåˆ¶åˆ‡æ¢ç¼“å†² */
+    /* ©¤©¤©¤ ½ÓÊÕ°ëÖ¡ÀÛ»ý×´Ì¬("ÍêÕûÖ¡²ÅÇÐ»º³åÍ¶µÝ") ©¤©¤©¤
+     * ´®¿ÚÓ¦´ð¿ÉÄÜ±» IDLE ÖÐ¶ÏÇÐ³É¶àÆ¬(¶Ô¶ËÖ¡ÄÚÍ£¶Ù)£¬
+     * ¹Ê ISR ½öÔÚ»º³åÄÚ¹¹³ÉÍêÕûÖ¡Ê±²ÅÇÐ»º³åÍ¶µÝ£¬·ñÔò±£³Ö DMA ¼ÌÐøÏò
+     * Í¬Ò»»º³å×·¼Ó£¬´Ó¸ùÉÏÏû³ý"°ëÖ¡"Á÷Èë½âÎö²ã¡£ */
+    volatile uint8_t  rx_part_active;   /* ISRÖÃ1: µ±Ç°»º³åÒÑÀÛ»ýµ«ÉÐÎ´³ÉÖ¡ */
+    volatile uint32_t rx_part_tick;     /* ISRÐ´Èë: °ëÖ¡ÆðÊ¼Ê±¿Ì(ms)£¬¹©ÖÍÁô¿´ÃÅ¹·ÅÐ¶¨ */
+    volatile uint8_t  rx_part_reset;    /* Ö÷Ñ­»·ÖÃ1: ÇëÇóISR¶ªÆú°ëÖ¡²¢Ç¿ÖÆÇÐ»»»º³å */
     
-    /* â”€â”€â”€ æ³¢ç‰¹çŽ‡é¢„è®¡ç®—: é¿å…æ¯æ¬¡TXé‡å¤é™¤æ³• â”€â”€â”€ */
-    uint32_t tx_us_per_byte;            /* å½“å‰æ³¢ç‰¹çŽ‡ä¸‹æ¯å­—èŠ‚å‘é€å¾®ç§’æ•° */
+    /* ©¤©¤©¤ ²¨ÌØÂÊÔ¤¼ÆËã: ±ÜÃâÃ¿´ÎTXÖØ¸´³ý·¨ ©¤©¤©¤ */
+    uint32_t tx_us_per_byte;            /* µ±Ç°²¨ÌØÂÊÏÂÃ¿×Ö½Ú·¢ËÍÎ¢ÃëÊý */
 };
 
 extern struct uart_data  uart_data_t;
@@ -262,13 +262,13 @@ int uartBaudRateSync(void);
 
 int uartTxWithSocketID(uint8_t Sour_Sockid, uint8_t Dest_Sockid, uint8_t *data, uint16_t length);
 
-uint32_t uartTxGetLastSeq(void);         /* è¿”å›žæœ€è¿‘ä¸€æ¬¡å…¥é˜Ÿçš„ä¸²å£è¯·æ±‚åºå·(req_queue.last_enq_seq) */
+uint32_t uartTxGetLastSeq(void);         /* ·µ»Ø×î½üÒ»´ÎÈë¶ÓµÄ´®¿ÚÇëÇóÐòºÅ(req_queue.last_enq_seq) */
 
 uint8_t uartSendPacketLen(uint8_t Sour_Sockid, uint8_t Dest_Sockid, uint8_t *tx_buf, uint16_t tx_len);
 
-void uartProcessDeferredRx(void);        /* ä¸»å¾ªçŽ¯ä¸­è°ƒç”¨ï¼šå¤„ç†ISRå»¶è¿Ÿçš„å¸§è§£æž+å‡ºé˜Ÿ+ä¸‹ä¸€åŒ… */
+void uartProcessDeferredRx(void);        /* Ö÷Ñ­»·ÖÐµ÷ÓÃ£º´¦ÀíISRÑÓ³ÙµÄÖ¡½âÎö+³ö¶Ó+ÏÂÒ»°ü */
 
-uint8_t uartRxPartialWatchdog(void);     /* ä¸»å¾ªçŽ¯ä¸­è°ƒç”¨ï¼šåŠå¸§æ»žç•™è¶…æ—¶åˆ™è¯·æ±‚å¤ä½æŽ¥æ”¶ç¼“å†², è¿”å›ž1=æœ¬æ¬¡è§¦å‘äº†å¤ä½ */
+uint8_t uartRxPartialWatchdog(void);     /* Ö÷Ñ­»·ÖÐµ÷ÓÃ£º°ëÖ¡ÖÍÁô³¬Ê±ÔòÇëÇó¸´Î»½ÓÊÕ»º³å, ·µ»Ø1=±¾´Î´¥·¢ÁË¸´Î» */
 
 void DMA1_Channel7_IRQHandler(void);
 

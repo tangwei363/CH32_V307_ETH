@@ -3,7 +3,7 @@
 * Author             : WCH
 * Version            : V1.0.0
 * Date               : 2024/07/18
-* Description        : Flash 配置读写模块
+* Description        : Flash ���ö�дģ��
 *********************************************************************************
 * Copyright (c) 2021 Nanjing Qinheng Microelectronics Co., Ltd.
 * Attention: This software (modified or not) and binary are used for 
@@ -13,39 +13,39 @@
 
 #include "debug.h"
 
-/* 全局宏定义 */
+/* ȫ�ֺ궨�� */
 
 #include "bsp_flash.h"
 #include "HTTPS.h"
 
-/* 全局变量 */
+/* ȫ�ֱ��� */
 volatile FLASH_Status FLASHStatus = FLASH_COMPLETE;
  
 
 Web_Page_State_t Web_Page_State[4] = {0};
-/* 定义三个结构体数组, 分别保存基本设置、端口设置、登录设置
- * TODO: 数组长度 4/4/2 为硬编码, 建议改为宏统一管理 */
+/* ���������ṹ������, �ֱ𱣴�������á��˿����á���¼����
+ * TODO: ���鳤�� 4/4/2 ΪӲ����, �����Ϊ��ͳһ���� */
 Parameter Para_Basic[4], Para_Port[4], Para_Login[2];
 
 Basic_Cfg_t Basic_CfgBuf;
 Port_Cfg_t  Port_CfgBuf;
 Login_Cfg_t Login_CfgBuf;
 
-/* WCHNET 网络参数默认配置
- * 格式: [0~1]校验码 0x57AB, [2~7]MAC, [8~11]IP, [12~15]掩码, [16~19]网关 */
+/* WCHNET �������Ĭ������
+ * ��ʽ: [0~1]У���� 0x57AB, [2~7]MAC, [8~11]IP, [12~15]����, [16~19]���� */
 const u8 Basic_Default[BASIC_CFG_LEN] = {
 0x57, 0xAB,
 01, 02, 03, 04, 05, 06, 192, 168, 1, 250, 255, 255, 255, 0, 192, 168, 1, 1};
 
-/* WCHNET 登录默认参数: 用户名 admin, 密码 123
- * 格式: [0~1]校验码 0x57AB, [2~12]用户名(11字节), [13~23]密码(11字节)
- * TODO: 生产环境应修改默认密码 */
+/* WCHNET ��¼Ĭ�ϲ���: �û��� admin, ���� 123
+ * ��ʽ: [0~1]У���� 0x57AB, [2~12]�û���(11�ֽ�), [13~23]����(11�ֽ�)
+ * TODO: ��������Ӧ�޸�Ĭ������ */
 const u8 Login_Default[LOGIN_CFG_LEN] = {
 0x57, 0xAB,
 'a', 'd', 'm', 'i', 'n', 0, 0, 0, 0, 0, 0, '1', '2', '3', 0, 0, 0, 0, 0, 0, 0, 0 };
 
-/* WCHNET 端口默认配置: TCP客户端模式
- * 格式: [0~1]校验码, [2]模式, [3~4]源端口(大端), [5~8]目标IP, [9~10]目标端口(大端) */
+/* WCHNET �˿�Ĭ������: TCP�ͻ���ģʽ
+ * ��ʽ: [0~1]У����, [2]ģʽ, [3~4]Դ�˿�(���), [5~8]Ŀ��IP, [9~10]Ŀ��˿�(���) */
 const u8 Port_Default[PORT_CFG_LEN] = {
 0x57, 0xAB,
 MODE_TCPCLIENT, 1000 / 256, 1000 % 256, 192, 168, 1, 100, 1000 / 256, 1000 % 256 };
@@ -53,11 +53,11 @@ MODE_TCPCLIENT, 1000 / 256, 1000 % 256, 192, 168, 1, 100, 1000 / 256, 1000 % 256
 /*********************************************************************
  * @fn      BSP_FLASH_RestoreDefaults
  *
- * @brief   恢复网络配置为出厂默认值, 逐项写入 Flash 后软件复位.
+ * @brief   �ָ���������Ϊ����Ĭ��ֵ, ����д�� Flash ��������λ.
  *
- * @return  无 (本函数不返回, 最终调用 NVIC_SystemReset)
+ * @return  �� (������������, ���յ��� NVIC_SystemReset)
  *
- * @note    使用 BSP_FLASH_WriteConfig (擦除→写入→校验), 每项配置独占 256B 快速页.
+ * @note    ʹ�� BSP_FLASH_WriteConfig (������д���У��), ÿ�����ö�ռ 256B ����ҳ.
  *          任一阶段失败会打印详��且最终仍复位, 确保不残留半写数据.
  */
 void BSP_FLASH_RestoreDefaults(void)
@@ -74,7 +74,7 @@ void BSP_FLASH_RestoreDefaults(void)
     BSP_DEBUG("Restore LOGIN: %d\r\n", status);
 
     Delay_Ms(10);
-    NVIC_SystemReset();  /* 软件复位使新配置生效 */
+    NVIC_SystemReset();  /* ������λʹ��������Ч */
 }
 
 /*********************************************************************
@@ -121,31 +121,31 @@ uint8_t CRC_Is_Used()
 /*********************************************************************
  * @fn      BSP_FLASH_ERASE
  *
- * @brief   擦除 Data-Flash 扇区, 最小擦除单位为 4K 字节(FLASH_ErasePage).
- *          如需 256B 精细擦除, 使用 BSP_FLASH_ERASE_Fast.
+ * @brief   ���� Data-Flash ����, ��С������λΪ 4K �ֽ�(FLASH_ErasePage).
+ *          ���� 256B ��ϸ����, ʹ�� BSP_FLASH_ERASE_Fast.
  *
- * @param   Page_Address - 起始页地址 (需 4K 对齐)
- *          Length       - 擦除长度(字节, 建议为 FLASH_PAGE_SIZE 整数倍)
+ * @param   Page_Address - ��ʼҳ��ַ (�� 4K ����)
+ *          Length       - ��������(�ֽ�, ����Ϊ FLASH_PAGE_SIZE ������)
  *
- * @return  无
+ * @return  ��
  *
- * @note    Length 若不是 FLASH_PAGE_SIZE(4KB) 整数倍则尾部不足一页部分不会被擦除.
- *          循环中若某一页擦除失败, 会 Lock Flash 后提前返回, 后续页面不再擦除.
+ * @note    Length ������ FLASH_PAGE_SIZE(4KB) ��������β������һҳ���ֲ��ᱻ����.
+ *          ѭ������ĳһҳ����ʧ��, �� Lock Flash ����ǰ����, ����ҳ�治�ٲ���.
  */
 void BSP_FLASH_ERASE(uint32_t Page_Address, u32 Length) {
     u32 NbrOfPage, EraseCounter;
 
     FLASH_Unlock();
-    /* TODO: Length 非页对齐时尾部被截断, 建议改为向上取整:
+    /* TODO: Length ��ҳ����ʱβ�����ض�, �����Ϊ����ȡ��:
      *       NbrOfPage = (Length + FLASH_PAGE_SIZE - 1) / FLASH_PAGE_SIZE; */
     NbrOfPage = Length / FLASH_PAGE_SIZE;
     FLASH_ClearFlag(FLASH_FLAG_BSY | FLASH_FLAG_EOP | FLASH_FLAG_WRPRTERR);
     for (EraseCounter = 0; EraseCounter < NbrOfPage; EraseCounter++) {
-        /* BUGFIX: 使用局部变量而非全局 FLASHStatus, 避免被其他操作覆盖 */
+        /* BUGFIX: ʹ�þֲ���������ȫ�� FLASHStatus, ���ⱻ������������ */
         FLASH_Status status = FLASH_ErasePage(Page_Address + (FLASH_PAGE_SIZE * EraseCounter));
         if (status != FLASH_COMPLETE) {
             printf("FLASH Erase Fail at 0x%08lX\r\n", Page_Address + (FLASH_PAGE_SIZE * EraseCounter));
-            FLASH_Lock();  /* BUGFIX: 提前返回前必须 Lock, 否则 Flash 保持解锁 */
+            FLASH_Lock();  /* BUGFIX: ��ǰ����ǰ���� Lock, ���� Flash ���ֽ��� */
             return;
         }
     }
@@ -155,109 +155,109 @@ void BSP_FLASH_ERASE(uint32_t Page_Address, u32 Length) {
 /*********************************************************************
  * @fn      BSP_FLASH_ERASE_Fast
  *
- * @brief   按 256 字节页快速擦除 Data-Flash.
- *          底层调用 FLASH_ErasePage_Fast, 需要 FLASH_Unlock_Fast 进入快速模式.
+ * @brief   �� 256 �ֽ�ҳ���ٲ��� Data-Flash.
+ *          �ײ���� FLASH_ErasePage_Fast, ��Ҫ FLASH_Unlock_Fast �������ģʽ.
  *
- * @param   Page_Address - 起始页地址 (须 256 字节对齐, 内部自动 & 0xFFFFFF00 对齐)
- *          Length       - 擦除长度(字节, 需为 256 的整数倍)
+ * @param   Page_Address - ��ʼҳ��ַ (�� 256 �ֽڶ���, �ڲ��Զ� & 0xFFFFFF00 ����)
+ *          Length       - ��������(�ֽ�, ��Ϊ 256 ��������)
  *
- * @return  FLASH_Status - FLASH_COMPLETE 表示成功; FLASH_TIMEOUT 表示等待忙超时
+ * @return  FLASH_Status - FLASH_COMPLETE ��ʾ�ɹ�; FLASH_TIMEOUT ��ʾ�ȴ�æ��ʱ
  *
- * @note    FLASH_ErasePage_Fast 无返回值, 通过等待 BSY 标志位判断完成. 若超时返回
- *          FLASH_TIMEOUT. 相比标准擦除(4KB/22ms), 快速擦除(256B/1.4ms)更精细,
- *          适合只擦除小范围配置区. 注意: FLASH_ErasePage_Fast 擦除后自动退出 BSY,
- *          写入前仍需 FLASH_Unlock (标准解锁) 而非 FLASH_Unlock_Fast.
+ * @note    FLASH_ErasePage_Fast �޷���ֵ, ͨ���ȴ� BSY ��־λ�ж����. ����ʱ����
+ *          FLASH_TIMEOUT. ��ȱ�׼����(4KB/22ms), ���ٲ���(256B/1.4ms)����ϸ,
+ *          �ʺ�ֻ����С��Χ������. ע��: FLASH_ErasePage_Fast �������Զ��˳� BSY,
+ *          д��ǰ���� FLASH_Unlock (��׼����) ���� FLASH_Unlock_Fast.
  */
 FLASH_Status BSP_FLASH_ERASE_Fast(uint32_t Page_Address, u32 Length) {
     u32 NbrOfPage, EraseCounter;
     u32 timeout;
 
-    /* 向上取整确保覆盖所有数据 */
+    /* ����ȡ��ȷ�������������� */
     NbrOfPage = (Length + 255) / 256;
 
-    FLASH_Unlock_Fast();  /* 进入快速擦除模式 */
+    FLASH_Unlock_Fast();  /* ������ٲ���ģʽ */
     FLASH_ClearFlag(FLASH_FLAG_BSY | FLASH_FLAG_EOP | FLASH_FLAG_WRPRTERR);
 
     for (EraseCounter = 0; EraseCounter < NbrOfPage; EraseCounter++) {
         FLASH_ErasePage_Fast(Page_Address + (256 * EraseCounter));
 
-        /* FLASH_ErasePage_Fast 无返回值, 手动等待 BSY 位清除 */
+        /* FLASH_ErasePage_Fast �޷���ֵ, �ֶ��ȴ� BSY λ��� */
         timeout = 0x100000;
         while (FLASH->STATR & (1 << 0)) {  /* SR_BSY */
             if (--timeout == 0) {
                 printf("FLASH Erase Fast Timeout at 0x%08lX\r\n",
                        Page_Address + (256 * EraseCounter));
-                FLASH_Lock_Fast();  /* 超时退出快速模式 */
+                FLASH_Lock_Fast();  /* ��ʱ�˳�����ģʽ */
                 return FLASH_TIMEOUT;
             }
         }
     }
 
-    FLASH_Lock_Fast();  /* 退出快速擦除模式 */
+    FLASH_Lock_Fast();  /* �˳����ٲ���ģʽ */
     return FLASH_COMPLETE;
 }
 
 /*********************************************************************
  * @fn      BSP_FLASH_WriteConfig
  *
- * @brief   配置数据写入 Flash 原子操作: 擦除(256B) → 写入(数据+CRC) → CRC校验.
- *          数据布局: [0..Length-1] 用户数据, [Length..251] 0xFF填充,
- *                    [252..255] CRC32校验值 (硬件CRC, RecalculateCRC).
+ * @brief   ��������д�� Flash ԭ�Ӳ���: ����(256B) �� д��(����+CRC) �� CRCУ��.
+ *          ���ݲ���: [0..Length-1] �û�����, [Length..251] 0xFF���,
+ *                    [252..255] CRC32У��ֵ (Ӳ��CRC, RecalculateCRC).
  *
- * @param   Addr   - Flash 目标地址 (需 256B 对齐)
- *          Buffer - 数据源缓冲区
- *          Length - 数据长度(字节, 若不足4的倍数则尾部自动补0对齐)
+ * @param   Addr   - Flash Ŀ���ַ (�� 256B ����)
+ *          Buffer - ����Դ������
+ *          Length - ���ݳ���(�ֽ�, ������4�ı�����β���Զ���0����)
  *
- * @return  FLASH_COMPLETE  全部成功
- *          其他值          失败 (擦除超时/写入错误/CRC不匹配)
+ * @return  FLASH_COMPLETE  ȫ���ɹ�
+ *          ����ֵ          ʧ�� (������ʱ/д�����/CRC��ƥ��)
  *
- * @note    每次写入完整 256B 页: 用户数据 + 填充 + CRC32.
- *          回读校验时重算 CRC 并与尾部存储值比对, 单次比较即可验证完整性.
+ * @note    ÿ��д������ 256B ҳ: �û����� + ��� + CRC32.
+ *          �ض�У��ʱ���� CRC ����β���洢ֵ�ȶ�, ���αȽϼ�����֤������.
  */
 FLASH_Status BSP_FLASH_WriteConfig(u32 Addr, const u8 *Buffer, u32 Length)
 {
     FLASH_Status status;
     u32 crc_calc, crc_stored;
     u32 data_words, i;
-    /* 写缓冲区: [0..data_words-1]=用户数据, [63]=CRC32, 其余 0xFFFFFFFF */
+    /* д������: [0..data_words-1]=�û�����, [63]=CRC32, ���� 0xFFFFFFFF */
     u32 write_buf[FLASH_PAGE_SIZE_FAST / 4];
 
-    /* 数据向上取整到 u32 边界, 不足一字的部分补 0 后参与 CRC */
+    /* ��������ȡ���� u32 �߽�, ����һ�ֵĲ��ֲ� 0 ����� CRC */
     data_words = (Length + 3) / 4;
 
-    /* 初始化整个缓冲区为 0xFFFFFFFF (Flash 擦除态, 减少编程磨损) */
+    /* ��ʼ������������Ϊ 0xFFFFFFFF (Flash ����̬, ���ٱ��ĥ��) */
     for (i = 0; i < FLASH_PAGE_SIZE_FAST / 4; i++) {
         write_buf[i] = 0xFFFFFFFF;
     }
-    /* 复制用户数据 (按字拷贝, 不足一字的部分自动由 0xFFFFFFFF 补位 → 需修正) */
+    /* �����û����� (���ֿ���, ����һ�ֵĲ����Զ��� 0xFFFFFFFF ��λ �� ������) */
     for (i = 0; i < Length; i++) {
         ((u8 *)write_buf)[i] = Buffer[i];
     }
-    /* 尾部不足一字的字节清零 (避免 0xFF 污染 CRC) */
+    /* β������һ�ֵ��ֽ����� (���� 0xFF ��Ⱦ CRC) */
     for (i = Length; i < data_words * 4; i++) {
         ((u8 *)write_buf)[i] = 0x00;
     }
 
-    /* 阶段0: 计算数据区 CRC32 (覆盖 Length 向上对齐后的 data_words 个字) */
+    /* �׶�0: ���������� CRC32 (���� Length ���϶����� data_words ����) */
     crc_calc = RecalculateCRC(write_buf, data_words);
-    /* CRC 存入 256B 页尾部最后一个 u32 */
+    /* CRC ���� 256B ҳβ�����һ�� u32 */
     write_buf[(FLASH_PAGE_SIZE_FAST / 4) - 1] = crc_calc;
 
-    /* 阶段1: 256B 快速页擦除 */
+    /* �׶�1: 256B ����ҳ���� */
     status = BSP_FLASH_ERASE_Fast(Addr, FLASH_PAGE_SIZE_FAST);
     if (status != FLASH_COMPLETE) {
         BSP_DEBUG("WriteCfg Erase Fail at 0x%08lX: %d\r\n", Addr, status);
         return status;
     }
 
-    /* 阶段2: 写入完整 256B 页 (数据 + 填充 + CRC) */
+    /* �׶�2: д������ 256B ҳ (���� + ��� + CRC) */
     status = BSP_FLASH_WRITE_Word(Addr, (u8 *)write_buf, FLASH_PAGE_SIZE_FAST);
     if (status != FLASH_COMPLETE) {
         BSP_DEBUG("WriteCfg Write Fail at 0x%08lX: %d\r\n", Addr, status);
         return status;
     }
 
-    /* 阶段3: CRC 校验 — 回读数据区, 重算 CRC 与尾部存储值比对 */
+    /* �׶�3: CRC У�� �� �ض�������, ���� CRC ��β���洢ֵ�ȶ� */
     BSP_FLASH_READ(Addr, (u8 *)write_buf, FLASH_PAGE_SIZE_FAST);
     crc_calc = RecalculateCRC(write_buf, data_words);
     crc_stored = write_buf[(FLASH_PAGE_SIZE_FAST / 4) - 1];
@@ -265,7 +265,7 @@ FLASH_Status BSP_FLASH_WriteConfig(u32 Addr, const u8 *Buffer, u32 Length)
     if (crc_calc != crc_stored) {
         BSP_DEBUG("WriteCfg CRC Mismatch at 0x%08lX: Calc=%08lX Stored=%08lX\r\n",
                   Addr, crc_calc, crc_stored);
-        return (FLASH_Status)(-1);  /* CRC 校验失败 */
+        return (FLASH_Status)(-1);  /* CRC У��ʧ�� */
     }
 
     return FLASH_COMPLETE;
@@ -274,22 +274,22 @@ FLASH_Status BSP_FLASH_WriteConfig(u32 Addr, const u8 *Buffer, u32 Length)
 /*********************************************************************
  * @fn      BSP_FLASH_WRITE_Word
  *
- * @brief   按字(4字节)写入 Data-Flash.
- *          底层调用 FLASH_ProgramWord, 该函数内部拆为两次半字写入
- *          (先写低16位到 Address, 再写高16位到 Address+2).
+ * @brief   ����(4�ֽ�)д�� Data-Flash.
+ *          �ײ���� FLASH_ProgramWord, �ú����ڲ���Ϊ���ΰ���д��
+ *          (��д��16λ�� Address, ��д��16λ�� Address+2).
  *
- * @param   StartAddr - 写入起始地址 (需 4 字节对齐)
- *          Buffer    - 数据缓冲区指针 (需 4 字节对齐)
- *          Length    - 数据长度(字节, 需为 4 的整数倍)
+ * @param   StartAddr - д����ʼ��ַ (�� 4 �ֽڶ���)
+ *          Buffer    - ���ݻ�����ָ�� (�� 4 �ֽڶ���)
+ *          Length    - ���ݳ���(�ֽ�, ��Ϊ 4 ��������)
  *
- * @return  FLASH_Status - FLASH_COMPLETE 表示成功, 其他值表示失败
+ * @return  FLASH_Status - FLASH_COMPLETE ��ʾ�ɹ�, ����ֵ��ʾʧ��
  *
- * @note    对齐要求: Cortex-M3 内核, u8* → u32* 非对齐可能触发 UsageFault.
- *          Length 非 4 的倍数时尾部不足一字的数据会被丢弃.
+ * @note    ����Ҫ��: Cortex-M3 �ں�, u8* �� u32* �Ƕ�����ܴ��� UsageFault.
+ *          Length �� 4 �ı���ʱβ������һ�ֵ����ݻᱻ����.
  */
 FLASH_Status BSP_FLASH_WRITE_Word(u32 StartAddr, const u8 *Buffer, u32 Length) {
     u32 address = StartAddr;
-    u32 *p_buff = (u32 *) Buffer;  // 要求 Buffer 4 字节对齐
+    u32 *p_buff = (u32 *) Buffer;  // Ҫ�� Buffer 4 �ֽڶ���
     FLASH_Status FLASHStatus = FLASH_COMPLETE;
 
     FLASH_Unlock();
@@ -306,18 +306,18 @@ FLASH_Status BSP_FLASH_WRITE_Word(u32 StartAddr, const u8 *Buffer, u32 Length) {
 /*********************************************************************
  * @fn      BSP_FLASH_WRITE_HalfWord
  *
- * @brief   按半字(2字节)写入 Data-Flash.
- *          底层调用 FLASH_ProgramHalfWord.
+ * @brief   ������(2�ֽ�)д�� Data-Flash.
+ *          �ײ���� FLASH_ProgramHalfWord.
  *
- * @param   StartAddr - 写入起始地址 (需 2 字节对齐)
- *          Buffer    - 数据缓冲区指针 (需 2 字节对齐)
- *          Length    - 数据长度(字节, 需为 2 的整数倍)
+ * @param   StartAddr - д����ʼ��ַ (�� 2 �ֽڶ���)
+ *          Buffer    - ���ݻ�����ָ�� (�� 2 �ֽڶ���)
+ *          Length    - ���ݳ���(�ֽ�, ��Ϊ 2 ��������)
  *
- * @return  FLASH_Status - FLASH_COMPLETE 表示成功, 其他值表示失败
+ * @return  FLASH_Status - FLASH_COMPLETE ��ʾ�ɹ�, ����ֵ��ʾʧ��
  */
 FLASH_Status BSP_FLASH_WRITE_HalfWord(u32 StartAddr, const u8 *Buffer, u32 Length) {
     u32 address = StartAddr;
-    u16 *p_buff = (u16 *) Buffer;  // 要求 Buffer 2 字节对齐
+    u16 *p_buff = (u16 *) Buffer;  // Ҫ�� Buffer 2 �ֽڶ���
     FLASH_Status FLASHStatus = FLASH_COMPLETE;
 
     FLASH_Unlock();
@@ -334,19 +334,19 @@ FLASH_Status BSP_FLASH_WRITE_HalfWord(u32 StartAddr, const u8 *Buffer, u32 Lengt
 /*********************************************************************
  * @fn      BSP_FLASH_WRITE_ByteData
  *
- * @brief   【严重Bug】按字节写入选项字节区 (0x1FFFF800), 非数据 Flash!
- *          底层调用 FLASH_ProgramOptionByteData, 该 SDK 函数固定操作选项字节区域,
- *          Address 参数为选项字节内的偏移, 而非数据 Flash 地址.
+ * @brief   ������Bug�����ֽ�д��ѡ���ֽ��� (0x1FFFF800), ������ Flash!
+ *          �ײ���� FLASH_ProgramOptionByteData, �� SDK �����̶�����ѡ���ֽ�����,
+ *          Address ����Ϊѡ���ֽ��ڵ�ƫ��, �������� Flash ��ַ.
  *
- * @param   StartAddr - 选项字节区偏移地址
- *          Buffer    - 数据缓冲区指针
- *          Length    - 数据长度(字节)
+ * @param   StartAddr - ѡ���ֽ���ƫ�Ƶ�ַ
+ *          Buffer    - ���ݻ�����ָ��
+ *          Length    - ���ݳ���(�ֽ�)
  *
- * @return  FLASH_Status - FLASH_COMPLETE 表示成功, 其他值表示失败
+ * @return  FLASH_Status - FLASH_COMPLETE ��ʾ�ɹ�, ����ֵ��ʾʧ��
  *
- * @warning 本函数操作的是选项字节区 (Option Bytes), 不是常规 Flash 数据区.
- *          若需按字节写数据 Flash, 请改用 BSP_FLASH_WRITE_Word 并自行处理
- *          读-改-写流程 (Flash 不支持字节级写入).
+ * @warning ��������������ѡ���ֽ��� (Option Bytes), ���ǳ��� Flash ������.
+ *          ���谴�ֽ�д���� Flash, ����� BSP_FLASH_WRITE_Word �����д���
+ *          ��-��-д���� (Flash ��֧���ֽڼ�д��).
  */
 FLASH_Status BSP_FLASH_WRITE_ByteData(u32 StartAddr, const u8 *Buffer, u32 Length) {
     u32 address = StartAddr;
@@ -356,7 +356,7 @@ FLASH_Status BSP_FLASH_WRITE_ByteData(u32 StartAddr, const u8 *Buffer, u32 Lengt
     FLASH_Unlock();
     while ((address < (StartAddr + Length)) && (FLASHStatus == FLASH_COMPLETE))
     {
-        /* 注意: FLASH_ProgramOptionByteData 操作的是选项字节区, 非数据 Flash */
+        /* ע��: FLASH_ProgramOptionByteData ��������ѡ���ֽ���, ������ Flash */
         FLASHStatus = FLASH_ProgramOptionByteData(address, *p_buff);
         address++;
         p_buff++;
@@ -368,24 +368,24 @@ FLASH_Status BSP_FLASH_WRITE_ByteData(u32 StartAddr, const u8 *Buffer, u32 Lengt
 /*********************************************************************
  * @fn      BSP_FLASH_READ
  *
- * @brief   按字(4字节)读取 Data-Flash (Flash 是内存映射的, 直接解引用即可).
+ * @brief   ����(4�ֽ�)��ȡ Data-Flash (Flash ���ڴ�ӳ���, ֱ�ӽ����ü���).
  *
- * @param   StartAddr - 读取起始地址
- *          Buffer    - 数据缓冲区指针 (需 4 字节对齐)
- *          Length    - 数据长度(字节, 需为 4 的整数倍)
+ * @param   StartAddr - ��ȡ��ʼ��ַ
+ *          Buffer    - ���ݻ�����ָ�� (�� 4 �ֽڶ���)
+ *          Length    - ���ݳ���(�ֽ�, ��Ϊ 4 ��������)
  *
- * @return  无
+ * @return  ��
  *
- * @note    Cortex-M3 可直接读取 Flash 映射地址, 无需解锁.
- *          Length 非 4 的倍数时尾部不足一字的数据不会被读取.
+ * @note    Cortex-M3 ��ֱ�Ӷ�ȡ Flash ӳ���ַ, �������.
+ *          Length �� 4 �ı���ʱβ������һ�ֵ����ݲ��ᱻ��ȡ.
  */
 void BSP_FLASH_READ(u32 StartAddr, u8 *Buffer, u32 Length) {
     u32 address = StartAddr;
-    u32 *p_buff = (u32 *) Buffer;  // 要求 Buffer 4 字节对齐
+    u32 *p_buff = (u32 *) Buffer;  // Ҫ�� Buffer 4 �ֽڶ���
 
     while (address < (StartAddr + Length))
     {
-        *p_buff = (*(u32 *)address);  // 直接解引用 Flash 映射地址
+        *p_buff = (*(u32 *)address);  // ֱ�ӽ����� Flash ӳ���ַ
         address += 4;
         p_buff++;
     }

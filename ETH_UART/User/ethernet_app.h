@@ -30,7 +30,7 @@
 #define ENABLE_ERROR_LOGGING         1       // 启用错误日志
 
 #define NET_RETRY_DELAY_MS           100     // 重试延迟(ms)
-#define NET_MAX_RETRY_COUNT          3      // 最大重试次数
+#define NET_MAX_RETRY_COUNT          3       // 最大重试次数
 
  
 #define ETH_RXBUF_MAX_SIZE          512

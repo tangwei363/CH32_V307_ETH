@@ -3,7 +3,7 @@
  * Author             : AI Assistant
  * Version            : V1.0.0
  * Date               : 2026/03/16
- * Description        : ä¸‰è±FX3U-ENET-ADPä¿¡æ¯é¡µé¢å¤´æ–‡ä»¶
+ * Description        : ÈıÁâFX3U-ENET-ADPĞÅÏ¢Ò³ÃæÍ·ÎÄ¼ş
 *********************************************************************************
 * Copyright (c) 2026 AI Assistant. All rights reserved.
 *******************************************************************************/
@@ -19,67 +19,67 @@ extern "C" {
 #include "ethernet_app.h"
 #include "fifo_queue.h"
 
-/* LEDç±»å‹å®šä¹‰ */
+/* LEDÀàĞÍ¶¨Òå */
 typedef enum {
-    FX_ENET_LED_POWER = 0,    /* ç”µæºLED */
-    FX_ENET_LED_100M,         /* 100Mé€Ÿåº¦LED */
-    FX_ENET_LED_ERR,          /* é”™è¯¯LED */
-    FX_ENET_LED_OPEN          /* æ‰“å¼€çŠ¶æ€LED */
+    FX_ENET_LED_POWER = 0,    /* µçÔ´LED */
+    FX_ENET_LED_100M,         /* 100MËÙ¶ÈLED */
+    FX_ENET_LED_ERR,          /* ´íÎóLED */
+    FX_ENET_LED_OPEN          /* ´ò¿ª×´Ì¬LED */
 } fx_enetinf_led_type_t;
 
-/* LEDçŠ¶æ€å®šä¹‰ */
+/* LED×´Ì¬¶¨Òå */
 typedef enum {
-    FX_ENET_LED_OFF = 0,      /* å…³é—­ */
-    FX_ENET_LED_ON,           /* æ‰“å¼€ */
-    FX_ENET_LED_GREEN         /* ç»¿è‰² */
+    FX_ENET_LED_OFF = 0,      /* ¹Ø±Õ */
+    FX_ENET_LED_ON,           /* ´ò¿ª */
+    FX_ENET_LED_GREEN         /* ÂÌÉ« */
 } fx_enetinf_led_state_t;
 
-/* åè®®ç±»å‹ */
+/* Ğ­ÒéÀàĞÍ */
 typedef enum {
-    FX_ENET_PROTO_TCP = 0,    /* TCPåè®® */
-    FX_ENET_PROTO_UDP         /* UDPåè®® */
+    FX_ENET_PROTO_TCP = 0,    /* TCPĞ­Òé */
+    FX_ENET_PROTO_UDP         /* UDPĞ­Òé */
 } fx_enetinf_proto_type_t;
 
-/* å¼€æ”¾æ–¹å¼ */
+/* ¿ª·Å·½Ê½ */
 typedef enum {
-    FX_ENET_OPEN_MELSOFT = 0, /* MELSOFTè¿æ¥ */
-    FX_ENET_OPEN_MC,          /* MCåè®® */
-    FX_ENET_OPEN_MONITOR,     /* æ•°æ®ç›‘è§† */
-    FX_ENET_OPEN_UNKNOWN      /* æœªçŸ¥ */
+    FX_ENET_OPEN_MELSOFT = 0, /* MELSOFTÁ¬½Ó */
+    FX_ENET_OPEN_MC,          /* MCĞ­Òé */
+    FX_ENET_OPEN_MONITOR,     /* Êı¾İ¼àÊÓ */
+    FX_ENET_OPEN_UNKNOWN      /* Î´Öª */
 } fx_enetinf_open_type_t;
 
- /* é€‚é…å™¨ä¿¡æ¯ç»“æ„ä½“ */
+ /* ÊÊÅäÆ÷ĞÅÏ¢½á¹¹Ìå */
 typedef struct {
-    uint16_t                  version;        /* ç‰ˆæœ¬å·(BCDç , 1.22 = 0x0122) */
+    uint16_t                  version;        /* °æ±¾ºÅ(BCDÂë, 1.22 = 0x0122) */
  
-    fx_enetinf_led_state_t    led_power;     /* POWER LEDçŠ¶æ€ */
-    fx_enetinf_led_state_t    led_100m;      /* 100M LEDçŠ¶æ€ */
-    fx_enetinf_led_state_t    led_err;       /* ERR LEDçŠ¶æ€ */
-    fx_enetinf_led_state_t    led_open;      /* OPEN LEDçŠ¶æ€ */
+    fx_enetinf_led_state_t    led_power;     /* POWER LED×´Ì¬ */
+    fx_enetinf_led_state_t    led_100m;      /* 100M LED×´Ì¬ */
+    fx_enetinf_led_state_t    led_err;       /* ERR LED×´Ì¬ */
+    fx_enetinf_led_state_t    led_open;      /* OPEN LED×´Ì¬ */
 } fx_enetinf_adapter_t;
 
-/* é”™è¯¯å±¥å†ç»“æ„ä½“ */
+/* ´íÎóÂÄÀú½á¹¹Ìå */
 typedef struct {
-    uint16_t     conn_id;        /* è¿æ¥å· */
-    uint16_t     protocol;       /* åè®®ç±»å‹ */
-    uint16_t     open_type;      /* å¼€æ”¾æ–¹å¼ */
-    uint16_t     local_port;      /* æœ¬ç«™ç«¯å£å· */
-    uint16_t     error_code;     /* é”™è¯¯ä»£ç  */
-    uint8_t     remote_ip[4];    /* é€šä¿¡å¯¹è±¡IPåœ°å€ */
-    uint16_t    remote_port;     /* é€šä¿¡å¯¹è±¡ç«¯å£å· */
-    uint16_t     cmd_code;       /* æŒ‡ä»¤ä»£ç  */
-    uint16_t    reserved_1;        // ä¿ç•™      0x0000
-    uint16_t    reserved_2;        // ä¿ç•™      0x0000
-    eth_log_time_t log_time;    // æ—¥å¿—æ—¶é—´
+    uint16_t     conn_id;        /* Á¬½ÓºÅ */
+    uint16_t     protocol;       /* Ğ­ÒéÀàĞÍ */
+    uint16_t     open_type;      /* ¿ª·Å·½Ê½ */
+    uint16_t     local_port;      /* ±¾Õ¾¶Ë¿ÚºÅ */
+    uint16_t     error_code;     /* ´íÎó´úÂë */
+    uint8_t     remote_ip[4];    /* Í¨ĞÅ¶ÔÏóIPµØÖ· */
+    uint16_t    remote_port;     /* Í¨ĞÅ¶ÔÏó¶Ë¿ÚºÅ */
+    uint16_t     cmd_code;       /* Ö¸Áî´úÂë */
+    uint16_t    reserved_1;        // ±£Áô      0x0000
+    uint16_t    reserved_2;        // ±£Áô      0x0000
+    eth_log_time_t log_time;    // ÈÕÖ¾Ê±¼ä
 } fx_enetinf_error_log_t;
 
  
-#define FX_ENETINF_MAX_ERRORS  8   /* æœ€å¤§é”™è¯¯å±¥å†æ•°(16â†’8: g_error_logs ç”±544Bé™è‡³272B) */
+#define FX_ENETINF_MAX_ERRORS  8   /* ×î´ó´íÎóÂÄÀúÊı(16¡ú8: g_error_logs ÓÉ544B½µÖÁ272B) */
 
-extern fx_enetinf_error_log_t g_error_logs[];  /* é”™è¯¯å±¥å†æ•°ç»„ */
-extern fifo_queue_t g_error_fifo;  /* é”™è¯¯å±¥å†é˜Ÿåˆ— */
+extern fx_enetinf_error_log_t g_error_logs[];  /* ´íÎóÂÄÀúÊı×é */
+extern fifo_queue_t g_error_fifo;  /* ´íÎóÂÄÀú¶ÓÁĞ */
 
-/* å‡½æ•°å£°æ˜ */
+/* º¯ÊıÉùÃ÷ */
 void FX_ENETINF_Init(void);
 void FX_ENETINF_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,char *url);
 void FX_ENETINF_GetAdapterInfo(fx_enetinf_adapter_t *info);
