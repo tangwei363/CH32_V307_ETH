@@ -17,7 +17,7 @@ extern "C" {
 #include "ch32v30x.h"
 
 /* USER CODE END Private defines */
-//#define _FX_DEVMON_DEBUG            //日志模块 开关，注释掉将关闭日志输出
+#define _FX_DEVMON_DEBUG            //日志模块 开关，注释掉将关闭日志输出
 
 #ifdef _FX_DEVMON_DEBUG
     #define DEVMON_DEBUG(format, ...)  printf (format, ##__VA_ARGS__)
@@ -187,7 +187,9 @@ typedef struct {
 void FX_DEVMON_Init(void);
 
 /* 发送Web页面 (流式发送) */
-void FX_DEVMON_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,  char *url);
+/* fetch_data: 1 = 本次渲染需向 PLC 发起批量读（浏览器请求路径）；
+ *             0 = 仅用已有数据渲染（UART 回帧路径），避免"回帧->渲染->再读->再回帧"自激循环 */
+void FX_DEVMON_SendWebPage(uint8_t Sour_Sock, uint8_t Dest_Sock, char *url, uint8_t fetch_data);
 
 /* 获取监视配置 */
 fx_devmon_config_t* FX_DEVMON_GetConfig(void);

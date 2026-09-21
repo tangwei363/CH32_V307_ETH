@@ -1,0 +1,18 @@
+/* ★ 分包打包（带容量校验）——替代页面里的 sprintf(temp_buffer + offset, ...)
+ *
+ * 用法与 sprintf 一致，只是第一个参数改为"缓冲区 + 当前偏移"：
+ *      offset += HTML_PACK(temp_buffer, offset, "<td>%d</td>", value);
+ *
+ * 与 sprintf 的三点区别，也是加它的原因：
+ *   1) 写入前先校验剩余空间，最多写到 cap-1，绝不写穿 BSS 中相邻的
+ *      http_request / g_access_fifo / g_access_logs（历史两次 HardFault 根因）；
+ *   2) 一旦发生截断立即 printf 告警（所需/剩余字节数与当前偏移），
+ *      把"静默炸内存"变成"串口日志可见的渲染截断"；
+ *   3) 返回值恒为"实际写入字节数"，因此 offset 永远不会 >= cap。
+ *
+ * 容量用 HTML_LEN（HtmlBuffer[HTML_LEN] 的定义值，见 HTTPS.c）。
+ */
+#define HTML_PACK(buf, off, ...) \
+    Html_PackChk((buf), (uint32_t)(off), (uint32_t)HTML_LEN, __VA_ARGS__)
+
+uint32_t Html_PackChk(char *buf, uint32_t off, uint32_t cap, const char *fmt, ...);

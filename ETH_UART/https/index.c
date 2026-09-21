@@ -24,8 +24,15 @@ static uint8_t  mitsu_table_sock = 0xFF;
 /* 累积阈值：留 32 字节余量，确保追加时不会越界 */
 #define MITSU_TABLE_EMIT_LIMIT    (MITSU_TABLE_BUFFER_SIZE - 32)
 
-/* 主页HTML内容 - 使用共享组件精简版 */
-const char Html_Index_Content[] = "<div class=\"x\"><div class=\"c1\">小崎科技</div><div class=\"p\">MELSEC-F FX3U-ENET-ADP</div><div class=\"t\">数据监控</div></div>";
+/* 主页内容：品牌 / 型号 / 用途，三段式排版（样式见共享 CSS 的 .hero* 规则）
+ * 说明：标题层级用 h1，桌面 40px、窄屏 26px（见 CSS 媒体查询），与页脚风格统一。 */
+const char Html_Index_Content[] =
+    "<div class=\"hero\">\r\n"
+    "<div class=\"hero-brand\">小崎科技</div>\r\n"
+    "<h1 class=\"hero-title\">MELSEC-F FX3U-ENET-ADP</h1>\r\n"
+    "<div class=\"hero-sub\">数据监控</div>\r\n"
+    "<div class=\"hero-line\"></div>\r\n"
+    "</div>\r\n";
 
 /*********************************************************************
  * @fn      MITSU_HTTP_GetTableBuffer
@@ -182,7 +189,7 @@ void FX_index_SendWebPage(uint8_t Dest_Sock, char *url)
 
     /* 第一次打包: HTML头部到</head> (使用共享组件) */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, HTML_GetComponent(HTML_COMP_HEADER), "主页");
+    offset += HTML_PACK(temp_buffer, offset, HTML_GetComponent(HTML_COMP_HEADER), "主页");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 
     /* CSS 样式表直发：组件 >1.2KB，HtmlBuffer 装不下(越界会写穿 BSS 导致死机) */
@@ -191,7 +198,7 @@ void FX_index_SendWebPage(uint8_t Dest_Sock, char *url)
 
     /* 第二次打包: body开始到导航栏结束 (使用共享组件) */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_BODY_START_NEW));
+    offset += HTML_PACK(temp_buffer, offset, "%s", HTML_GetComponent(HTML_COMP_BODY_START_NEW));
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 
     /* 导航栏直发：组件约 0.9KB，同样超过 HtmlBuffer 容量 */
@@ -200,8 +207,12 @@ void FX_index_SendWebPage(uint8_t Dest_Sock, char *url)
 
     /* 第三次打包: 内容区域和页脚 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "%s", Html_Index_Content);
-    offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_FOOTER_NEW));
+    offset += HTML_PACK(temp_buffer, offset, "%s", Html_Index_Content);
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
+
+    /* 页脚(含 SX 自检脚本)直发：组件 >1.2KB，远超 HtmlBuffer 容量(1024B)。
+     * 原来与收尾内容挤在同一包 -> 越界写穿 http_request / g_access_fifo -> HardFault。 */
+    Data_Send(Dest_Sock, (uint8_t*)HTML_GetComponent(HTML_COMP_FOOTER_NEW),
+              strlen(HTML_GetComponent(HTML_COMP_FOOTER_NEW)));
 
 }

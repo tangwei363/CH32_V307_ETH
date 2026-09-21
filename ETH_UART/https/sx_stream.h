@@ -127,6 +127,12 @@ void SX_Abort(u8 sock);
 u8 SX_Active(u8 sock);
 
 /**
+ * @brief  本次响应是否已出现发送失败(对端断开)，由 SX_RawSend 维护
+ * @note   SX_Send 的分包循环据此提前放弃剩余分包，避免整页空转重试
+ */
+extern u8 g_sx_tx_failed;
+
+/**
  * @brief  只读查询某 socket 的流状态（调试用），越界或未启用返回 NULL
  */
 const sx_stream_t *SX_GetState(u8 sock);

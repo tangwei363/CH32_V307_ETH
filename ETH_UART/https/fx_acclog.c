@@ -313,15 +313,15 @@ static void FX_ACCLOG_SendAccessTable(uint8_t Dest_Sock)
 
     /* 第一次打包: 表格容器开始 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<table border=\"1\" cellspacing=\"1\" style=\"margin:0 auto;\">\r\n<tbody>\r\n<tr>\r\n<td>\r\n<table border=\"1\" cellspacing=\"0\" bgcolor=\"#ffffff\" style=\"table-layout:fixed;text-align:center;font-size:14px\">\r\n<tbody>\r\n<tr bgcolor=\"#cccccc\">\r\n");
-    offset += sprintf(temp_buffer + offset, "<td width=\"60\">No.</td>\r\n");
-    offset += sprintf(temp_buffer + offset, "<td width=\"130\">年月日</td>\r\n");
-    offset += sprintf(temp_buffer + offset, "<td width=\"80\">时间</td>\r\n");
-    offset += sprintf(temp_buffer + offset, "<td width=\"190\">连接号</td>\r\n");
-    offset += sprintf(temp_buffer + offset, "<td width=\"80\">协议</td>\r\n");
-    offset += sprintf(temp_buffer + offset, "<td width=\"160\">开放方式</td>\r\n");
-    offset += sprintf(temp_buffer + offset, "<td width=\"110\">通信对象<br>IP地址</td>\r\n");
-    offset += sprintf(temp_buffer + offset, "</tr>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<table border=\"1\" cellspacing=\"1\" style=\"margin:0 auto;\">\r\n<tbody>\r\n<tr>\r\n<td>\r\n<table border=\"1\" cellspacing=\"0\" bgcolor=\"#ffffff\" style=\"table-layout:fixed;text-align:center;font-size:14px\">\r\n<tbody>\r\n<tr bgcolor=\"#cccccc\">\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<td width=\"60\">No.</td>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<td width=\"130\">年月日</td>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<td width=\"80\">时间</td>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<td width=\"190\">连接号</td>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<td width=\"80\">协议</td>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<td width=\"160\">开放方式</td>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<td width=\"110\">通信对象<br>IP地址</td>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "</tr>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 
     /* 生成并发送访问履历行，每4-5行打包一次 */
@@ -335,7 +335,7 @@ static void FX_ACCLOG_SendAccessTable(uint8_t Dest_Sock)
         /* 显示最新记录 */
         fx_acclog_record_t latest_record;
         if (FX_ACCLOG_GetNextRecord(&latest_record)) {
-            offset += sprintf(temp_buffer + offset,
+            offset += HTML_PACK(temp_buffer, offset,
                     "<tr>\r\n"
                     "<td class=\"ct\">最新</td>\r\n"
                     "<td>%04d-%02d-%02d</td>\r\n"
@@ -365,7 +365,7 @@ static void FX_ACCLOG_SendAccessTable(uint8_t Dest_Sock)
         fx_acclog_record_t record;
         uint8_t record_index = 1;
         while (FX_ACCLOG_GetNextRecord(&record) && record_index < rows) {
-            offset += sprintf(temp_buffer + offset,
+            offset += HTML_PACK(temp_buffer, offset,
                     "<tr>\r\n"
                     "<td class=\"ct\">%d</td>\r\n"
                     "<td>%04d-%02d-%02d</td>\r\n"
@@ -396,7 +396,7 @@ static void FX_ACCLOG_SendAccessTable(uint8_t Dest_Sock)
         
         /* 显示空行 */
         for (; record_index < rows; record_index++) {
-            offset += sprintf(temp_buffer + offset,
+            offset += HTML_PACK(temp_buffer, offset,
                     "<tr>\r\n"
                     "<td class=\"ct\">%d</td>\r\n"
                     "<td>&nbsp;</td>\r\n"
@@ -419,7 +419,7 @@ static void FX_ACCLOG_SendAccessTable(uint8_t Dest_Sock)
     } else {
         /* 所有行都是空行 */
         for (i = 0; i < rows; i++) {
-            offset += sprintf(temp_buffer + offset,
+            offset += HTML_PACK(temp_buffer, offset,
                     "<tr>\r\n"
                     "<td class=\"ct\">%d</td>\r\n"
                     "<td>&nbsp;</td>\r\n"
@@ -448,7 +448,7 @@ static void FX_ACCLOG_SendAccessTable(uint8_t Dest_Sock)
 
     /* 表格尾部 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "</tbody>\r\n</table>\r\n</td>\r\n</tr>\r\n</tbody>\r\n</table>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "</tbody>\r\n</table>\r\n</td>\r\n</tr>\r\n</tbody>\r\n</table>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 }
 
@@ -475,44 +475,50 @@ void FX_ACCLOG_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,char *url)
     SendHttpHeader(Dest_Sock, PTYPE_HTML);
     /* 第一次打包: HTML头部到</head> (使用共享组件) */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, HTML_GetComponent(HTML_COMP_HEADER), "访问履历");
+    offset += HTML_PACK(temp_buffer, offset, HTML_GetComponent(HTML_COMP_HEADER), "访问履历");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     /* CSS 样式表直发：组件 >1.2KB，HtmlBuffer 装不下(越界会写穿 BSS 导致死机) */
     Data_Send(Dest_Sock, (uint8_t*)HTML_GetComponent(HTML_COMP_CSS_NEW),
               strlen(HTML_GetComponent(HTML_COMP_CSS_NEW)));
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_BODY_START_NEW));
+    offset += HTML_PACK(temp_buffer, offset, "%s", HTML_GetComponent(HTML_COMP_BODY_START_NEW));
     Data_Send(Dest_Sock, (uint8_t*)HTML_GetComponent(HTML_COMP_NAV_BAR_NEW),
               strlen(HTML_GetComponent(HTML_COMP_NAV_BAR_NEW)));
     
     /* 第五次打包: 内容区域开始、页面标题和表单开始 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<div class=\"content\">\r\n<br>\r\n");
-    offset += sprintf(temp_buffer + offset, "<div style=\"text-align:center\"><font style=\"font-size=16px\"><b>访问履历</b></font></div>\r\n");
-    offset += sprintf(temp_buffer + offset, "<form action=\"fx_acclog.html\" method=\"post\">\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<div class=\"content\">\r\n<br>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<div style=\"text-align:center\"><font style=\"font-size=16px\"><b>访问履历</b></font></div>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<form action=\"fx_acclog.html\" method=\"post\">\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     /* 第六次打包: 控制面板 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" style=\"table-layout:fixed; font-size:14px; margin:0 auto;\">\r\n<tbody>\r\n<tr><td width=\"100\"></td><td width=\"100\"></td><td width=\"100\"></td><td width=\"100\"></td><td width=\"100\"></td><td width=\"100\"></td><td width=\"80\"></td><td width=\"80\"></td></tr>\r\n");
-    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"5\"></td><td colspan=\"1\" align=\"right\">状态 :&nbsp;</td><td colspan=\"2\">%s</td></tr>\r\n", monitor_status);
-    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"6\"></td><td colspan=\"2\"><input type=\"submit\" name=\"CMD\" value=\"监视开始\" style=\"width:120;font-weight:bold\"></td></tr>\r\n");
-    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"6\"></td><td colspan=\"2\"><input type=\"submit\" name=\"CMD\" value=\"监视停止\" style=\"width:120;font-weight:bold\"></td></tr>\r\n");
-    offset += sprintf(temp_buffer + offset, "</tbody>\r\n</table>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" style=\"table-layout:fixed; font-size:14px; margin:0 auto;\">\r\n<tbody>\r\n<tr><td width=\"100\"></td><td width=\"100\"></td><td width=\"100\"></td><td width=\"100\"></td><td width=\"100\"></td><td width=\"100\"></td><td width=\"80\"></td><td width=\"80\"></td></tr>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<tr><td colspan=\"5\"></td><td colspan=\"1\" align=\"right\">状态 :&nbsp;</td><td colspan=\"2\">%s</td></tr>\r\n", monitor_status);
+    offset += HTML_PACK(temp_buffer, offset, "<tr><td colspan=\"6\"></td><td colspan=\"2\"><input type=\"submit\" name=\"CMD\" value=\"监视开始\" style=\"width:120;font-weight:bold\"></td></tr>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<tr><td colspan=\"6\"></td><td colspan=\"2\"><input type=\"submit\" name=\"CMD\" value=\"监视停止\" style=\"width:120;font-weight:bold\"></td></tr>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "</tbody>\r\n</table>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     /* 第七次打包: 表单结束 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<input type=\"hidden\" name=\"LANG\" value=\"ZS\">\r\n");
-    offset += sprintf(temp_buffer + offset, "</form>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<input type=\"hidden\" name=\"LANG\" value=\"ZS\">\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "</form>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     /* 第八次打包: 生成并发送访问履历表格（分批发送） */
     FX_ACCLOG_SendAccessTable(Dest_Sock);
     /* 第九次打包: 页面尾部 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "</div>\r\n");
-    offset += sprintf(temp_buffer + offset, "</div>\r\n");
-    offset += sprintf(temp_buffer + offset, "</body>\r\n</html>\r\n");
-    offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_FOOTER_NEW));
+    offset += HTML_PACK(temp_buffer, offset, "</div>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "</div>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "</body>\r\n</html>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
+
+    /* 页脚(含 SX 自检脚本)直发：组件 >1.2KB，远超 HtmlBuffer 容量。
+     * 原来与收尾标签挤在同一包(约 1.27KB) -> 越界写穿 http_request / g_access_fifo
+     * (其 records 指针被 HTML 文本覆盖) -> 下一次 FX_ACCLOG_AddRecord() 取 conn_id
+     * 即 HardFault(mcause=4 未对齐取数, mtval 为文本字节)。 */
+    Data_Send(Dest_Sock, (uint8_t*)HTML_GetComponent(HTML_COMP_FOOTER_NEW),
+              strlen(HTML_GetComponent(HTML_COMP_FOOTER_NEW)));
 
     FX_ACCLOG_DEBUG("访问履历页面流式发送完成\r\n");
 }

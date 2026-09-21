@@ -517,13 +517,13 @@ void FX_ENETINF_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,char *url)
     SendHttpHeader(Dest_Sock, PTYPE_HTML);
     /* 第一次打包: HTML头部和CSS样式 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, HTML_GetComponent(HTML_COMP_HEADER), "FX3U-ENET-ADP信息");
+    offset += HTML_PACK(temp_buffer, offset, HTML_GetComponent(HTML_COMP_HEADER), "FX3U-ENET-ADP信息");
     /* CSS 样式表直发：组件 >1.2KB，HtmlBuffer 装不下(越界会写穿 BSS 导致死机) */
     Data_Send(Dest_Sock, (uint8_t*)HTML_GetComponent(HTML_COMP_CSS_NEW),
               strlen(HTML_GetComponent(HTML_COMP_CSS_NEW)));
     /* 第二次打包: body开始到导航栏结束 (使用共享组件) */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_BODY_START_NEW));
+    offset += HTML_PACK(temp_buffer, offset, "%s", HTML_GetComponent(HTML_COMP_BODY_START_NEW));
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 
     /* 导航栏直发：组件约 0.9KB，同样超过 HtmlBuffer 容量 */
@@ -531,23 +531,26 @@ void FX_ENETINF_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,char *url)
               strlen(HTML_GetComponent(HTML_COMP_NAV_BAR_NEW)));
     /* 第四次打包: 表单开始和适配器信息标题 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_REFRESH));
-    offset += sprintf(temp_buffer + offset, "<div style=\"text-align:center;\">\r\n");
-    offset += sprintf(temp_buffer + offset, "<form action=\"fx_enetinf.html\" method=\"post\" style=\"display:inline-block; text-align:left;\">\r\n");
-    offset += sprintf(temp_buffer + offset, "<font style=\"font-size=16px\"><b>FX3U-ENET-ADP信息</b></font>\r\n");
-    offset += sprintf(temp_buffer + offset, "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" style=\"table-layout:fixed; font-size:14px; margin:0 auto;\">\r\n<tbody>\r\n<tr>\r\n<td width=\"20\"></td>\r\n<td width=\"50\"></td>\r\n<td width=\"10\"></td>\r\n<td width=\"50\"></td>\r\n<td width=\"10\"></td>\r\n<td width=\"90\"></td>\r\n<td width=\"200\"></td>\r\n<td width=\"170\"></td>\r\n<td width=\"80\"></td>\r\n<td width=\"80\"></td>\r\n</tr>\r\n");
+    /* 只有"监视执行中"才主动刷新；停止时不注入 meta refresh，改为被动 GET 刷新 */
+    if (net_monitor_state == FX_MONITOR_RUNNING) {
+        offset += HTML_PACK(temp_buffer, offset, "%s", HTML_GetComponent(HTML_COMP_REFRESH));
+    }
+    offset += HTML_PACK(temp_buffer, offset, "<div style=\"text-align:center;\">\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<form action=\"fx_enetinf.html\" method=\"post\" style=\"display:inline-block; text-align:left;\">\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<font style=\"font-size=16px\"><b>FX3U-ENET-ADP信息</b></font>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" style=\"table-layout:fixed; font-size:14px; margin:0 auto;\">\r\n<tbody>\r\n<tr>\r\n<td width=\"20\"></td>\r\n<td width=\"50\"></td>\r\n<td width=\"10\"></td>\r\n<td width=\"50\"></td>\r\n<td width=\"10\"></td>\r\n<td width=\"90\"></td>\r\n<td width=\"200\"></td>\r\n<td width=\"170\"></td>\r\n<td width=\"80\"></td>\r\n<td width=\"80\"></td>\r\n</tr>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     /* 第五次打包: 状态行和版本行 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"7\">以太网适配器信息</td>\r\n<td colspan=\"1\" align=\"right\">状态 :&nbsp;</td>\r\n<td colspan=\"2\">%s</td>\r\n</tr>\r\n", monitor_status);
-    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"5\">FX3U-ENET-ADP 版本</td>\r\n<td colspan=\"1\" class=\"inf\" align=\"right\">%d.%02d</td>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"2\"><input type=\"submit\" name=\"CMD\" value=\"监视开始\" style=\"width:120;font-weight:bold\"></td>\r\n</tr>\r\n", (g_adapter_info.version >> 8) & 0xFF, g_adapter_info.version & 0xFF);
-    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"8\"></td>\r\n<td colspan=\"2\"><input type=\"submit\" name=\"CMD\" value=\"监视停止\" style=\"width:120;font-weight:bold\"></td>\r\n</tr>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<tr>\r\n<td colspan=\"7\">以太网适配器信息</td>\r\n<td colspan=\"1\" align=\"right\">状态 :&nbsp;</td>\r\n<td colspan=\"2\">%s</td>\r\n</tr>\r\n", monitor_status);
+    offset += HTML_PACK(temp_buffer, offset, "<tr>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"5\">FX3U-ENET-ADP 版本</td>\r\n<td colspan=\"1\" class=\"inf\" align=\"right\">%d.%02d</td>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"2\"><input type=\"submit\" name=\"CMD\" value=\"监视开始\" style=\"width:120;font-weight:bold\"></td>\r\n</tr>\r\n", (g_adapter_info.version >> 8) & 0xFF, g_adapter_info.version & 0xFF);
+    offset += HTML_PACK(temp_buffer, offset, "<tr>\r\n<td colspan=\"8\"></td>\r\n<td colspan=\"2\"><input type=\"submit\" name=\"CMD\" value=\"监视停止\" style=\"width:120;font-weight:bold\"></td>\r\n</tr>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     /* 第六次打包: 以太网适配器设置行 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"10\">以太网适配器设置</td>\r\n</tr>\r\n<tr>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"5\">IP地址</td>\r\n<td colspan=\"1\" class=\"inf\" align=\"right\">%d.%d.%d.%d</td>\r\n<td colspan=\"3\"></td>\r\n</tr>\r\n", Basic_CfgBuf.ip[0], Basic_CfgBuf.ip[1], Basic_CfgBuf.ip[2], Basic_CfgBuf.ip[3]);
-    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"5\">子网掩码类型</td>\r\n<td colspan=\"1\" class=\"inf\" align=\"right\">%d.%d.%d.%d</td>\r\n<td colspan=\"3\"></td>\r\n</tr>\r\n", Basic_CfgBuf.mask[0], Basic_CfgBuf.mask[1], Basic_CfgBuf.mask[2], Basic_CfgBuf.mask[3]);
-    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"5\">默认路由器IP地址</td>\r\n<td colspan=\"1\" class=\"inf\" align=\"right\">%d.%d.%d.%d</td>\r\n<td colspan=\"3\"></td>\r\n</tr>\r\n", Basic_CfgBuf.gateway[0], Basic_CfgBuf.gateway[1], Basic_CfgBuf.gateway[2], Basic_CfgBuf.gateway[3]);
+    offset += HTML_PACK(temp_buffer, offset, "<tr>\r\n<td colspan=\"10\">以太网适配器设置</td>\r\n</tr>\r\n<tr>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"5\">IP地址</td>\r\n<td colspan=\"1\" class=\"inf\" align=\"right\">%d.%d.%d.%d</td>\r\n<td colspan=\"3\"></td>\r\n</tr>\r\n", Basic_CfgBuf.ip[0], Basic_CfgBuf.ip[1], Basic_CfgBuf.ip[2], Basic_CfgBuf.ip[3]);
+    offset += HTML_PACK(temp_buffer, offset, "<tr>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"5\">子网掩码类型</td>\r\n<td colspan=\"1\" class=\"inf\" align=\"right\">%d.%d.%d.%d</td>\r\n<td colspan=\"3\"></td>\r\n</tr>\r\n", Basic_CfgBuf.mask[0], Basic_CfgBuf.mask[1], Basic_CfgBuf.mask[2], Basic_CfgBuf.mask[3]);
+    offset += HTML_PACK(temp_buffer, offset, "<tr>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"5\">默认路由器IP地址</td>\r\n<td colspan=\"1\" class=\"inf\" align=\"right\">%d.%d.%d.%d</td>\r\n<td colspan=\"3\"></td>\r\n</tr>\r\n", Basic_CfgBuf.gateway[0], Basic_CfgBuf.gateway[1], Basic_CfgBuf.gateway[2], Basic_CfgBuf.gateway[3]);
     /* 以太网适配器设置段必须在这里发出去：原代码只拼装、不发送，
      * 内容随即被下一个分包(offset=0)覆盖 → 页面缺整段"以太网适配器设置"。 */
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
@@ -558,18 +561,18 @@ void FX_ENETINF_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,char *url)
      * 都未发出；这里改成本文件内可用的 FX_ENETINF_LEDClass()，
      * 且 LED 段单独成包，不与上面的设置行挤在同一缓冲。 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"10\">&nbsp;</td>\r\n</tr>\r\n");
-    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"10\">LED 状态</td>\r\n</tr>\r\n");
-    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" align=\"right\">POWER</td>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" class=\"%s\">&nbsp;</td>\r\n<td colspan=\"6\"></td>\r\n</tr>\r\n", FX_ENETINF_LEDClass(g_adapter_info.led_power));
-    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" align=\"right\">100M</td>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" class=\"%s\">&nbsp;</td>\r\n<td colspan=\"6\"></td>\r\n</tr>\r\n", FX_ENETINF_LEDClass(g_adapter_info.led_100m));
-    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" align=\"right\">ERR.</td>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" class=\"%s\">&nbsp;</td>\r\n<td colspan=\"6\"></td>\r\n</tr>\r\n", FX_ENETINF_LEDClass(g_adapter_info.led_err));
-    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" align=\"right\">OPEN</td>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" class=\"%s\">&nbsp;</td>\r\n<td colspan=\"6\"></td>\r\n</tr>\r\n", FX_ENETINF_LEDClass(g_adapter_info.led_open));
-    offset += sprintf(temp_buffer + offset, "</tbody>\r\n</table>\r\n<input type=\"hidden\" name=\"LANG\" value=\"ZS\">\r\n</form>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<tr>\r\n<td colspan=\"10\">&nbsp;</td>\r\n</tr>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<tr>\r\n<td colspan=\"10\">LED 状态</td>\r\n</tr>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<tr>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" align=\"right\">POWER</td>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" class=\"%s\">&nbsp;</td>\r\n<td colspan=\"6\"></td>\r\n</tr>\r\n", FX_ENETINF_LEDClass(g_adapter_info.led_power));
+    offset += HTML_PACK(temp_buffer, offset, "<tr>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" align=\"right\">100M</td>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" class=\"%s\">&nbsp;</td>\r\n<td colspan=\"6\"></td>\r\n</tr>\r\n", FX_ENETINF_LEDClass(g_adapter_info.led_100m));
+    offset += HTML_PACK(temp_buffer, offset, "<tr>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" align=\"right\">ERR.</td>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" class=\"%s\">&nbsp;</td>\r\n<td colspan=\"6\"></td>\r\n</tr>\r\n", FX_ENETINF_LEDClass(g_adapter_info.led_err));
+    offset += HTML_PACK(temp_buffer, offset, "<tr>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" align=\"right\">OPEN</td>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" class=\"%s\">&nbsp;</td>\r\n<td colspan=\"6\"></td>\r\n</tr>\r\n", FX_ENETINF_LEDClass(g_adapter_info.led_open));
+    offset += HTML_PACK(temp_buffer, offset, "</tbody>\r\n</table>\r\n<input type=\"hidden\" name=\"LANG\" value=\"ZS\">\r\n</form>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 
     /* 第九次打包: 错误履历表格标题 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\">\r\n<tbody>\r\n<tr>\r\n<td colspan=\"5\" style=\"font-size:14px\">错误履历</td>\r\n<td colspan=\"3\"></td>\r\n</tr>\r\n</tbody>\r\n</table>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\">\r\n<tbody>\r\n<tr>\r\n<td colspan=\"5\" style=\"font-size:14px\">错误履历</td>\r\n<td colspan=\"3\"></td>\r\n</tr>\r\n</tbody>\r\n</table>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 
     /* 第十次打包: 错误履历表格 */
@@ -579,11 +582,17 @@ void FX_ENETINF_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,char *url)
  
     /* 打包: 页面尾部 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "</div>\r\n");
-    offset += sprintf(temp_buffer + offset, "</div>\r\n");
-    offset += sprintf(temp_buffer + offset, "</body>\r\n</html>\r\n");
-    offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_FOOTER_NEW));
+    offset += HTML_PACK(temp_buffer, offset, "</div>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "</div>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "</body>\r\n</html>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
+
+    /* 页脚(含 SX 自检脚本)直发：组件 >1.2KB，远超 HtmlBuffer 容量。
+     * 原来与收尾标签挤在同一包(约 1.27KB) -> 越界写穿 http_request / g_access_fifo
+     * (其 records 指针被 HTML 文本覆盖) -> 下一次 FX_ACCLOG_AddRecord() 取 conn_id
+     * 即 HardFault(mcause=4 未对齐取数, mtval 为文本字节)。 */
+    Data_Send(Dest_Sock, (uint8_t*)HTML_GetComponent(HTML_COMP_FOOTER_NEW),
+              strlen(HTML_GetComponent(HTML_COMP_FOOTER_NEW)));
 
     printf("FX3U-ENET-ADP信息页面流式发送完成\r\n");
 }

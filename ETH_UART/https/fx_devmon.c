@@ -730,10 +730,12 @@ static void FX_DEVMON_SendDataRows(uint8_t Dest_Sock, int start_row, int end_row
         FX_DEVMON_SendData_Table_Name ( dev_name, i );
         DEVMON_DEBUG("name:%s\n",dev_name);
        // 开始拼接 HTML 代码
-        offset = 0;
-        offset += sprintf(temp_buffer + offset, "<tr>");
+        /* ★ 不要在这里清零 offset：该缓冲是"多行累积、接近阈值才整批发送"的，
+         *   原实现每行开头 offset = 0，导致上一行的内容被本行覆盖，
+         *   结果每段只有最后一行发得出去(现场表现为表格只剩 D4、D7 两行)。 */
+        offset += HTML_PACK(temp_buffer, offset, "<tr>");
         /* 软元件名称 */    
-        offset += sprintf(temp_buffer + offset, "<td>%s</td>", dev_name);
+        offset += HTML_PACK(temp_buffer, offset, "<td>%s</td>", dev_name);
 
         /* 监视格式 */
         switch (g_monitor_config.form)
@@ -741,12 +743,12 @@ static void FX_DEVMON_SendDataRows(uint8_t Dest_Sock, int start_row, int end_row
         case FX_DEVMON_FORM_BIT:   /* 位 */
         
             // 只显示第0位
-            offset += sprintf(temp_buffer + offset, "<td class=\"c0\">%d</td>", g_data_rows[i].bit_values[0]);
+            offset += HTML_PACK(temp_buffer, offset, "<td class=\"c0\">%d</td>", g_data_rows[i].bit_values[0]);
             // 数值
             if (g_monitor_config.value_format == FX_DEVMON_VAL_HEX) {
-                offset += sprintf(temp_buffer + offset, "<td>%04X</td>\r\n", (uint16_t)(g_data_rows[i].word_value & 0xFFFF));
+                offset += HTML_PACK(temp_buffer, offset, "<td>%04X</td>\r\n", (uint16_t)(g_data_rows[i].word_value & 0xFFFF));
             } else {
-                offset += sprintf(temp_buffer + offset, "<td>%d</td>\r\n", (int)g_data_rows[i].word_value);
+                offset += HTML_PACK(temp_buffer, offset, "<td>%d</td>\r\n", (int)g_data_rows[i].word_value);
             }
             break;
             
@@ -758,19 +760,19 @@ static void FX_DEVMON_SendDataRows(uint8_t Dest_Sock, int start_row, int end_row
                 if (g_monitor_config.bit_order == FX_DEVMON_BIT_ORDER_F0) {
                     /* F-0 顺序 */
                     for (j = 0; j < 16; j++) {
-                        offset += sprintf(temp_buffer + offset, "<td class=\"c0\">%d</td>", g_data_rows[i].bit_values[15 - j]);
+                        offset += HTML_PACK(temp_buffer, offset, "<td class=\"c0\">%d</td>", g_data_rows[i].bit_values[15 - j]);
                     }
                 } else {
                     /* 0-F 顺序 */
                     for (j = 0; j < 16; j++) {
-                        offset += sprintf(temp_buffer + offset, "<td class=\"c0\">%d</td>", g_data_rows[i].bit_values[j]);
+                        offset += HTML_PACK(temp_buffer, offset, "<td class=\"c0\">%d</td>", g_data_rows[i].bit_values[j]);
                     }
                 }
                 // 数值
                 if (g_monitor_config.value_format == FX_DEVMON_VAL_HEX) {
-                    offset += sprintf(temp_buffer + offset, "<td>%04X</td>\r\n", (uint16_t)(g_data_rows[i].word_value & 0xFFFF));
+                    offset += HTML_PACK(temp_buffer, offset, "<td>%04X</td>\r\n", (uint16_t)(g_data_rows[i].word_value & 0xFFFF));
                 } else {
-                    offset += sprintf(temp_buffer + offset, "<td>%d</td>\r\n", (int)g_data_rows[i].word_value);
+                    offset += HTML_PACK(temp_buffer, offset, "<td>%d</td>\r\n", (int)g_data_rows[i].word_value);
                 }
                 
             }else{
@@ -780,58 +782,63 @@ static void FX_DEVMON_SendDataRows(uint8_t Dest_Sock, int start_row, int end_row
                    if (g_monitor_config.bit_order == FX_DEVMON_BIT_ORDER_F0) {
                     /* F-0 顺序 */
                         for (j = 0; j < 8; j++) {
-                            offset += sprintf(temp_buffer + offset, "<td class=\"c0\">%d</td>", g_data_rows[i].bit_values[8 - j]);
+                            offset += HTML_PACK(temp_buffer, offset, "<td class=\"c0\">%d</td>", g_data_rows[i].bit_values[8 - j]);
                         }
                     } else {
                         /* 0-F 顺序 */
                         for (j = 0; j < 8; j++) {
-                            offset += sprintf(temp_buffer + offset, "<td class=\"c0\">%d</td>", g_data_rows[i].bit_values[j]);
+                            offset += HTML_PACK(temp_buffer, offset, "<td class=\"c0\">%d</td>", g_data_rows[i].bit_values[j]);
                         }
                     }
                     // 数值 8位
                     if (g_monitor_config.value_format == FX_DEVMON_VAL_HEX) {
-                        offset += sprintf(temp_buffer + offset, "<td>%04X</td>\r\n", (uint16_t)(g_data_rows[i].word_value & 0xFF));
+                        offset += HTML_PACK(temp_buffer, offset, "<td>%04X</td>\r\n", (uint16_t)(g_data_rows[i].word_value & 0xFF));
                     } else {
-                        offset += sprintf(temp_buffer + offset, "<td>%d</td>\r\n", (int)g_data_rows[i].word_value);
+                        offset += HTML_PACK(temp_buffer, offset, "<td>%d</td>\r\n", (int)g_data_rows[i].word_value);
                     }
                 }else{ 
                     //M,S,T,C 10进制
                      if (g_monitor_config.bit_order == FX_DEVMON_BIT_ORDER_F0) {
                     /* F-0 顺序 */
                         for (j = 0; j < 10; j++) {
-                            offset += sprintf(temp_buffer + offset, "<td class=\"c0\">%d</td>", g_data_rows[i].bit_values[10 - j]);
+                            offset += HTML_PACK(temp_buffer, offset, "<td class=\"c0\">%d</td>", g_data_rows[i].bit_values[10 - j]);
                         }
                     } else {
                         /* 0-F 顺序 */
                         for (j = 0; j < 10; j++) {
-                            offset += sprintf(temp_buffer + offset, "<td class=\"c0\">%d</td>", g_data_rows[i].bit_values[j]);
+                            offset += HTML_PACK(temp_buffer, offset, "<td class=\"c0\">%d</td>", g_data_rows[i].bit_values[j]);
                         }
                     }
                     // 数值10位
                     if (g_monitor_config.value_format == FX_DEVMON_VAL_HEX) {
-                        offset += sprintf(temp_buffer + offset, "<td>%04X</td>\r\n", (uint16_t)(g_data_rows[i].word_value & 0x3FF));
+                        offset += HTML_PACK(temp_buffer, offset, "<td>%04X</td>\r\n", (uint16_t)(g_data_rows[i].word_value & 0x3FF));
                     } else {
-                        offset += sprintf(temp_buffer + offset, "<td>%d</td>\r\n", (int)(g_data_rows[i].word_value & 0x3FF));
+                        offset += HTML_PACK(temp_buffer, offset, "<td>%d</td>\r\n", (int)(g_data_rows[i].word_value & 0x3FF));
                     }
                 }
             }
             break;
         case FX_DEVMON_FORM_BIT_8_10:    /* 位(8/10点) */
+            /* 该分支一次要用 i..i+7 共 8 行，且下面还引用 8-i；
+             * 若行数不足(i 不为 0)会访问到 g_data_rows 之外(数组仅 FX_DEVMON_MAX_ROWS 行)。 */
+            if (i + 7 >= (int)FX_DEVMON_MAX_ROWS) {
+                break;
+            }
             //字软元件 D,R,T,C 每一个位都显示16位数据
             if (g_monitor_config.bit_order == FX_DEVMON_BIT_ORDER_F0) {
                 /* F-0 顺序 */
                 for (j = 0; j < 8; j++) {
-                    offset += sprintf(temp_buffer + offset, "<td class=\"c0\">%d</td>", g_data_rows[8-i].word_value);
+                    offset += HTML_PACK(temp_buffer, offset, "<td class=\"c0\">%d</td>", g_data_rows[(8 - i) < FX_DEVMON_MAX_ROWS ? (8 - i) : 0].word_value);
                 }
             } else {
                 /* 0-F 顺序 */
                 for (j = 0; j < 16; j++) {
-                    offset += sprintf(temp_buffer + offset, "<td class=\"c0\">%d</td>", g_data_rows[i].word_value);
+                    offset += HTML_PACK(temp_buffer, offset, "<td class=\"c0\">%d</td>", g_data_rows[i].word_value);
                 }
             }
             // 数值
             if (g_monitor_config.value_format == FX_DEVMON_VAL_HEX) {
-                offset += sprintf(temp_buffer + offset, "<td>%04X%04X%04X%04X%04X%04X%04X%04X</td>\r\n", 
+                offset += HTML_PACK(temp_buffer, offset, "<td>%04X%04X%04X%04X%04X%04X%04X%04X</td>\r\n", 
                                                                 g_data_rows[i].word_value ,
                                                                 g_data_rows[i+1].word_value,
                                                                 g_data_rows[i+2].word_value,
@@ -841,7 +848,7 @@ static void FX_DEVMON_SendDataRows(uint8_t Dest_Sock, int start_row, int end_row
                                                                 g_data_rows[i+6].word_value,
                                                                 g_data_rows[i+7].word_value);
             } else {
-                offset += sprintf(temp_buffer + offset, "<td>%d</td>\r\n", (int)g_data_rows[i].word_value);
+                offset += HTML_PACK(temp_buffer, offset, "<td>%d</td>\r\n", (int)g_data_rows[i].word_value);
             }
             i += 8;
 
@@ -850,13 +857,13 @@ static void FX_DEVMON_SendDataRows(uint8_t Dest_Sock, int start_row, int end_row
         default:
             // 默认情况，显示所有16位和数值
             for (j = 0; j < 16; j++) {
-                offset += sprintf(temp_buffer + offset, "<td class=\"c0\">%d</td>", g_data_rows[i].bit_values[j]);
+                offset += HTML_PACK(temp_buffer, offset, "<td class=\"c0\">%d</td>", g_data_rows[i].bit_values[j]);
             }
-            offset += sprintf(temp_buffer + offset, "<td>%d</td>\r\n", (int)g_data_rows[i].word_value);
+            offset += HTML_PACK(temp_buffer, offset, "<td>%d</td>\r\n", (int)g_data_rows[i].word_value);
             break;
         }
         /* 注释 */
-        offset += sprintf(temp_buffer + offset, "</tr>\r\n");
+        offset += HTML_PACK(temp_buffer, offset, "</tr>\r\n");
 
         /* 数据量达到阈值时发送 */
         if (offset > 450) {
@@ -868,42 +875,42 @@ static void FX_DEVMON_SendDataRows(uint8_t Dest_Sock, int start_row, int end_row
     /* 空行处理 */
     for (i = (g_row_count > start_row ? g_row_count : start_row); i < end_row && i < FX_DEVMON_MAX_ROWS; i++)
     {
-        offset += sprintf(temp_buffer + offset, "<tr>\r\n");
-        offset += sprintf(temp_buffer + offset, "<td>&nbsp;</td>\r\n");
+        offset += HTML_PACK(temp_buffer, offset, "<tr>\r\n");
+        offset += HTML_PACK(temp_buffer, offset, "<td>&nbsp;</td>\r\n");
         
         // 根据监视格式显示正确数量的空位列
         switch (g_monitor_config.form)
         {
         case FX_DEVMON_FORM_BIT:   /* 位 */
             // 只显示1个空位列
-            offset += sprintf(temp_buffer + offset, "<td>&nbsp;</td>\r\n");
+            offset += HTML_PACK(temp_buffer, offset, "<td>&nbsp;</td>\r\n");
             break;
             
         case FX_DEVMON_FORM_WORD:   /* 位&字 */
             // 显示8个空位列
             for (j = 0; j < 8; j++) {
-                offset += sprintf(temp_buffer + offset, "<td>&nbsp;</td>\r\n");
+                offset += HTML_PACK(temp_buffer, offset, "<td>&nbsp;</td>\r\n");
             }
             break;
             
         case FX_DEVMON_FORM_BIT_8_10:   /* 位(8/10点) */
             // 显示16个空位列
             for (j = 0; j < 16; j++) {
-                offset += sprintf(temp_buffer + offset, "<td>&nbsp;</td>\r\n");
+                offset += HTML_PACK(temp_buffer, offset, "<td>&nbsp;</td>\r\n");
             }
             break;
             
         default:
             // 默认显示16个空位列
             for (j = 0; j < 16; j++) {
-                offset += sprintf(temp_buffer + offset, "<td>&nbsp;</td>\r\n");
+                offset += HTML_PACK(temp_buffer, offset, "<td>&nbsp;</td>\r\n");
             }
             break;
         }
         
-        offset += sprintf(temp_buffer + offset, "<td>&nbsp;</td>\r\n");
-        offset += sprintf(temp_buffer + offset, "<td>&nbsp;</td>\r\n");
-        offset += sprintf(temp_buffer + offset, "</tr>\r\n");
+        offset += HTML_PACK(temp_buffer, offset, "<td>&nbsp;</td>\r\n");
+        offset += HTML_PACK(temp_buffer, offset, "<td>&nbsp;</td>\r\n");
+        offset += HTML_PACK(temp_buffer, offset, "</tr>\r\n");
         
         if (offset > 450) {
             Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
@@ -933,14 +940,14 @@ static void FX_DEVMON_SendData_Table(uint8_t Dest_Sock)
     uint32_t offset = 0;
     uint8_t num = 0;
     // 表格容器
-    offset += sprintf(buffer + offset, "<div style=\"overflow:auto; height:400px; width:840px; margin:0 auto\">\r\n");
+    offset += HTML_PACK(buffer, offset, "<div style=\"overflow:auto; height:400px; width:840px; margin:0 auto\">\r\n");
     // 表格开始
-    offset += sprintf(buffer + offset, "<table border=\"1\" rules=\"all\" cellspacing=\"0\" cellpadding=\"0\" style=\"table-layout:fixed; font-size:12px\">\r\n");
+    offset += HTML_PACK(buffer, offset, "<table border=\"1\" rules=\"all\" cellspacing=\"0\" cellpadding=\"0\" style=\"table-layout:fixed; font-size:12px\">\r\n");
     // 表头开始
-    offset += sprintf(buffer + offset, "<thead>\r\n");
+    offset += HTML_PACK(buffer, offset, "<thead>\r\n");
     
     // 第一列标题
-    offset += sprintf(buffer + offset, "<tr>\r\n<td width=\"80\">%s</td>\r\n", 
+    offset += HTML_PACK(buffer, offset, "<tr>\r\n<td width=\"80\">%s</td>\r\n", 
                      (g_monitor_config.monitor_type == FX_DEVMON_MONITOR_DEVICE) ? "软元件" : "缓冲存储器");
     
     // 数据位列标题
@@ -970,19 +977,19 @@ static void FX_DEVMON_SendData_Table(uint8_t Dest_Sock)
         //位顺序
         if( g_monitor_config.bit_order == FX_DEVMON_BIT_ORDER_0F)  /* 0-F */
         {
-            offset += sprintf(buffer + offset, "<td width=\"40\">+%X</td>", i);
+            offset += HTML_PACK(buffer, offset, "<td width=\"40\">+%X</td>", i);
         }else{ /* F-0 */
-            offset += sprintf(buffer + offset, "<td width=\"40\">+%X</td>", (num-i) );
+            offset += HTML_PACK(buffer, offset, "<td width=\"40\">+%X</td>", (num - 1 - i) );
         }
     }
     // 值列标题
-    offset += sprintf(buffer + offset, "\r\n<td width=\"60\">值</td>\r\n");
+    offset += HTML_PACK(buffer, offset, "\r\n<td width=\"60\">值</td>\r\n");
     // 表头行结束
-    offset += sprintf(buffer + offset, "</tr>\r\n");
+    offset += HTML_PACK(buffer, offset, "</tr>\r\n");
     // 表头结束
-    offset += sprintf(buffer + offset, "</thead>\r\n");
+    offset += HTML_PACK(buffer, offset, "</thead>\r\n");
     // 表体开始
-    offset += sprintf(buffer + offset, "<tbody>\r\n");
+    offset += HTML_PACK(buffer, offset, "<tbody>\r\n");
     
     // 发送数据
     Data_Send(Dest_Sock, (uint8_t*)buffer, offset);
@@ -998,16 +1005,22 @@ static void FX_DEVMON_SendData_Table(uint8_t Dest_Sock)
  *
  * @return  none
  */
-void FX_DEVMON_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,  char *url)
+void FX_DEVMON_SendWebPage(uint8_t Sour_Sock, uint8_t Dest_Sock, char *url, uint8_t fetch_data)
 {
     char *temp_buffer = HtmlBuffer;  /* 使用HtmlBuffer作为发送缓冲区 */
     char *monitor_status;
     uint32_t offset;
 
-    /* 更新监视数据 */
-    /* ★ 进入/刷新页面即发起一次 PLC 批量读（原为注释，导致从不采集）。
-     * 响应到达后由 UART 分发(HTTPS.c Web_Usart_Handler)更新行数据并重发本页。 */
-    FX_DEVMON_UpdateMonitor_CMD(Sour_Sock, Dest_Sock);
+    /* ★ fetch_data 决定本次渲染是否发起新的 PLC 批量读：
+     *   浏览器请求路径传 1 —— 渲染前取一次最新数据；
+     *   UART 回帧路径传 0 —— 只把刚收到的数据渲染出来，绝不再发起读取。
+     * 若回帧路径也发读，就会形成 回帧->渲染(发读)->回帧->渲染(发读)->... 的自激循环：
+     * 页面不断重发、UART 请求队列被刷满，最终看门狗复位(现场表现即"切到该页就重启")。
+     * 数据更新由 UART 分发的 FX_DEVMON_UpdateMonitor_Data() 完成，
+     * 浏览器每 5s 自动刷新，因此回帧路径无需重新取数。 */
+    if (fetch_data) {
+        FX_DEVMON_UpdateMonitor_CMD(Sour_Sock, Dest_Sock);
+    }
 
     /* 获取监控状态 */
     monitor_status  = (char*) HTML_GetStateString(net_monitor_state);
@@ -1016,19 +1029,20 @@ void FX_DEVMON_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,  char *url)
     
     /* 第一次打包: HTML头部（与 CSS 拆开，以在 </head> 之前插入自动更新 meta） */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, HTML_GetComponent(HTML_COMP_HEADER), "软元件/缓冲存储器批量监视");
+    offset += HTML_PACK(temp_buffer, offset, HTML_GetComponent(HTML_COMP_HEADER), "软元件/缓冲存储器批量监视");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 
-    /* 自动更新间隔：秒数取页面配置 INT(5~120)，越界钳到 5 秒。
-     * 必须位于 CSS 组件之前（CSS 组件自带 </style></head>）。
-     * 浏览器按此秒数重新请求本页 → 再次触发上面的批量读 → 形成自适应轮询。 */
-    {
+    /* ★ 只有"监视执行中"才注入 meta refresh：
+     *   执行中 -> 浏览器按间隔主动刷新，持续取数(自适应轮询)；
+     *   停止   -> 不注入刷新标签，页面只被被动 GET/POST 刷新，
+     *             不再无谓地占用网络与 UART 请求队列。 */
+    if (net_monitor_state == FX_MONITOR_RUNNING) {
         uint16_t itv = g_monitor_config.update_interval;
         if (itv < 5u || itv > 120u) {
             itv = 5u;
         }
         offset = 0;
-        offset += sprintf(temp_buffer + offset, "<meta http-equiv=\"refresh\" content=\"%u\">\r\n", itv);
+        offset += HTML_PACK(temp_buffer, offset, "<meta http-equiv=\"refresh\" content=\"%u\">\r\n", itv);
         Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     }
 
@@ -1040,66 +1054,66 @@ void FX_DEVMON_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,  char *url)
 
     /* 第二次打包: body开始到导航栏结束 (使用共享组件) */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_BODY_START_NEW));
-    offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_NAV_BAR_NEW));
+    offset += HTML_PACK(temp_buffer, offset, "%s", HTML_GetComponent(HTML_COMP_BODY_START_NEW));
+    offset += HTML_PACK(temp_buffer, offset, "%s", HTML_GetComponent(HTML_COMP_NAV_BAR_NEW));
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     
     /* 第四次打包: 表单标题 - 添加居中容器 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<div style=\"margin:0 auto; width:840px; text-align:center\">\r\n");
-    offset += sprintf(temp_buffer + offset, "<form action=\"fx_devmon.html\" method=\"post\" style=\"display:inline-block; text-align:left\">\r\n<font style=\"font-size=16px\"><b>软元件/缓冲存储器批量监视</b></font>\r\n<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" style=\"table-layout:fixed; font-size:14px; margin:0 auto\">\r\n<tbody>\r\n<tr>\r\n<td width=\"20\"></td><td width=\"140\"></td><td width=\"160\"></td><td width=\"80\"></td>\r\n<td width=\"100\"></td><td width=\"100\"></td><td width=\"80\"></td><td width=\"100\"></td>\r\n</tr>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<div style=\"margin:0 auto; width:840px; text-align:center\">\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<form action=\"fx_devmon.html\" method=\"post\" style=\"display:inline-block; text-align:left\">\r\n<font style=\"font-size=16px\"><b>软元件/缓冲存储器批量监视</b></font>\r\n<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" style=\"table-layout:fixed; font-size:14px; margin:0 auto\">\r\n<tbody>\r\n<tr>\r\n<td width=\"20\"></td><td width=\"140\"></td><td width=\"160\"></td><td width=\"80\"></td>\r\n<td width=\"100\"></td><td width=\"100\"></td><td width=\"80\"></td><td width=\"100\"></td>\r\n</tr>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     
     /* 第五次打包: 软元件配置行 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"5\">软元件</td>\r\n<td colspan=\"3\" align=\"right\">状态 :&nbsp;%s</td>\r\n</tr>\r\n", monitor_status);//监控状态
-    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"2\"><input type=\"radio\" name=\"MONT\" value=\"D\" %s>软元件名</td>\r\n", g_monitor_config.monitor_type == FX_DEVMON_MONITOR_DEVICE ? "checked" : "");
-    offset += sprintf(temp_buffer + offset, "<td colspan=\"3\">\r\n<select size=\"1\" name=\"DEVT\">\r\n<option %s>D</option>\r\n<option %s>R</option>\r\n<option %s>X</option>\r\n<option %s>Y</option>\r\n<option %s>M</option>\r\n<option %s>S</option>\r\n<option %s>T</option>\r\n<option %s>C</option>\r\n</select>\r\n", g_monitor_config.device_type == FX_DEVMON_DEV_D ? "selected" : "", g_monitor_config.device_type == FX_DEVMON_DEV_R ? "selected" : "", g_monitor_config.device_type == FX_DEVMON_DEV_X ? "selected" : "", g_monitor_config.device_type == FX_DEVMON_DEV_Y ? "selected" : "", g_monitor_config.device_type == FX_DEVMON_DEV_M ? "selected" : "", g_monitor_config.device_type == FX_DEVMON_DEV_S ? "selected" : "", g_monitor_config.device_type == FX_DEVMON_DEV_T ? "selected" : "", g_monitor_config.device_type == FX_DEVMON_DEV_C ? "selected" : "");
-    offset += sprintf(temp_buffer + offset, "<input type=\"text\" size=\"5\" maxlength=\"5\" name=\"DEVN\" value=\"%d\"></td>\r\n<td colspan=\"3\" align=\"right\"><input type=\"submit\" name=\"CMD\" value=\"监视开始\" style=\"width:120;font-weight:bold\"></td>\r\n</tr>\r\n", g_monitor_config.device_number);//监视开始按钮
+    offset += HTML_PACK(temp_buffer, offset, "<tr>\r\n<td colspan=\"5\">软元件</td>\r\n<td colspan=\"3\" align=\"right\">状态 :&nbsp;%s</td>\r\n</tr>\r\n", monitor_status);//监控状态
+    offset += HTML_PACK(temp_buffer, offset, "<tr>\r\n<td colspan=\"2\"><input type=\"radio\" name=\"MONT\" value=\"D\" %s>软元件名</td>\r\n", g_monitor_config.monitor_type == FX_DEVMON_MONITOR_DEVICE ? "checked" : "");
+    offset += HTML_PACK(temp_buffer, offset, "<td colspan=\"3\">\r\n<select size=\"1\" name=\"DEVT\">\r\n<option %s>D</option>\r\n<option %s>R</option>\r\n<option %s>X</option>\r\n<option %s>Y</option>\r\n<option %s>M</option>\r\n<option %s>S</option>\r\n<option %s>T</option>\r\n<option %s>C</option>\r\n</select>\r\n", g_monitor_config.device_type == FX_DEVMON_DEV_D ? "selected" : "", g_monitor_config.device_type == FX_DEVMON_DEV_R ? "selected" : "", g_monitor_config.device_type == FX_DEVMON_DEV_X ? "selected" : "", g_monitor_config.device_type == FX_DEVMON_DEV_Y ? "selected" : "", g_monitor_config.device_type == FX_DEVMON_DEV_M ? "selected" : "", g_monitor_config.device_type == FX_DEVMON_DEV_S ? "selected" : "", g_monitor_config.device_type == FX_DEVMON_DEV_T ? "selected" : "", g_monitor_config.device_type == FX_DEVMON_DEV_C ? "selected" : "");
+    offset += HTML_PACK(temp_buffer, offset, "<input type=\"text\" size=\"5\" maxlength=\"5\" name=\"DEVN\" value=\"%d\"></td>\r\n<td colspan=\"3\" align=\"right\"><input type=\"submit\" name=\"CMD\" value=\"监视开始\" style=\"width:120;font-weight:bold\"></td>\r\n</tr>\r\n", g_monitor_config.device_number);//监视开始按钮
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     
     /* 第六次打包: 缓冲存储器配置行 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"2\"><input type=\"radio\" name=\"MONT\" value=\"B\" %s>缓冲存储器</td>\r\n", g_monitor_config.monitor_type == FX_DEVMON_MONITOR_BUFFER ? "checked" : "");
-    offset += sprintf(temp_buffer + offset, "<td colspan=\"1\">模块起始 <select size=\"1\" name=\"MDL\" style=\"width:50;\">\r\n<option %s>0</option>\r\n<option %s>1</option>\r\n<option %s>2</option>\r\n<option %s>3</option>\r\n<option %s>4</option>\r\n<option %s>5</option>\r\n<option %s>6</option>\r\n<option %s>7</option>\r\n</select></td>\r\n", g_monitor_config.buffer_module == 0 ? "selected" : "", g_monitor_config.buffer_module == 1 ? "selected" : "", g_monitor_config.buffer_module == 2 ? "selected" : "", g_monitor_config.buffer_module == 3 ? "selected" : "", g_monitor_config.buffer_module == 4 ? "selected" : "", g_monitor_config.buffer_module == 5 ? "selected" : "", g_monitor_config.buffer_module == 6 ? "selected" : "", g_monitor_config.buffer_module == 7 ? "selected" : "");
-    offset += sprintf(temp_buffer + offset, "<td colspan=\"2\">地址 <input type=\"text\" size=\"5\" maxlength=\"5\" name=\"BFMN\" value=\"%d\">\r\n<select size=\"1\" name=\"BFMV\"><option %s>10进制</option><option %s>16进制</option></select></td>\r\n", g_monitor_config.buffer_address, g_monitor_config.buffer_hex == 0 ? "selected" : "", g_monitor_config.buffer_hex == 1 ? "selected" : "");
-    offset += sprintf(temp_buffer + offset, "<td colspan=\"3\" align=\"right\"><input type=\"submit\" name=\"CMD\" value=\"监视停止\" style=\"width:120;font-weight:bold\"></td>\r\n</tr>\r\n");//监视停止按钮
+    offset += HTML_PACK(temp_buffer, offset, "<tr>\r\n<td colspan=\"2\"><input type=\"radio\" name=\"MONT\" value=\"B\" %s>缓冲存储器</td>\r\n", g_monitor_config.monitor_type == FX_DEVMON_MONITOR_BUFFER ? "checked" : "");
+    offset += HTML_PACK(temp_buffer, offset, "<td colspan=\"1\">模块起始 <select size=\"1\" name=\"MDL\" style=\"width:50;\">\r\n<option %s>0</option>\r\n<option %s>1</option>\r\n<option %s>2</option>\r\n<option %s>3</option>\r\n<option %s>4</option>\r\n<option %s>5</option>\r\n<option %s>6</option>\r\n<option %s>7</option>\r\n</select></td>\r\n", g_monitor_config.buffer_module == 0 ? "selected" : "", g_monitor_config.buffer_module == 1 ? "selected" : "", g_monitor_config.buffer_module == 2 ? "selected" : "", g_monitor_config.buffer_module == 3 ? "selected" : "", g_monitor_config.buffer_module == 4 ? "selected" : "", g_monitor_config.buffer_module == 5 ? "selected" : "", g_monitor_config.buffer_module == 6 ? "selected" : "", g_monitor_config.buffer_module == 7 ? "selected" : "");
+    offset += HTML_PACK(temp_buffer, offset, "<td colspan=\"2\">地址 <input type=\"text\" size=\"5\" maxlength=\"5\" name=\"BFMN\" value=\"%d\">\r\n<select size=\"1\" name=\"BFMV\"><option %s>10进制</option><option %s>16进制</option></select></td>\r\n", g_monitor_config.buffer_address, g_monitor_config.buffer_hex == 0 ? "selected" : "", g_monitor_config.buffer_hex == 1 ? "selected" : "");
+    offset += HTML_PACK(temp_buffer, offset, "<td colspan=\"3\" align=\"right\"><input type=\"submit\" name=\"CMD\" value=\"监视停止\" style=\"width:120;font-weight:bold\"></td>\r\n</tr>\r\n");//监视停止按钮
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 
     
     /* 第七次打包: 自动更新间隔 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"6\"></td>\r\n<td colspan=\"2\">自动更新间隔时间(5 - 120)</td>\r\n</tr>\r\n<tr>\r\n<td colspan=\"1\"></td><td colspan=\"1\">监视格式</td><td colspan=\"1\">显示</td>\r\n<td colspan=\"1\">进制数</td><td colspan=\"2\">位顺序</td>\r\n<td colspan=\"2\"><input type=\"text\" size=\"5\" maxlength=\"3\" name=\"INT\" value=\"%d\">(秒)</td>\r\n</tr>\r\n", g_monitor_config.update_interval);
+    offset += HTML_PACK(temp_buffer, offset, "<tr>\r\n<td colspan=\"6\"></td>\r\n<td colspan=\"2\">自动更新间隔时间(5 - 120)</td>\r\n</tr>\r\n<tr>\r\n<td colspan=\"1\"></td><td colspan=\"1\">监视格式</td><td colspan=\"1\">显示</td>\r\n<td colspan=\"1\">进制数</td><td colspan=\"2\">位顺序</td>\r\n<td colspan=\"2\"><input type=\"text\" size=\"5\" maxlength=\"3\" name=\"INT\" value=\"%d\">(秒)</td>\r\n</tr>\r\n", g_monitor_config.update_interval);
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     
     /* 第八次打包: 配置选项行1 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"1\"></td><td colspan=\"1\"><input type=\"radio\" name=\"FORM\" value=\"BT\" %s>位</td>\r\n", g_monitor_config.form == FX_DEVMON_FORM_BIT ? "checked" : "");
-    offset += sprintf(temp_buffer + offset, "<td colspan=\"1\"><input type=\"radio\" name=\"DISP\" value=\"16\" %s>16位整数</td>\r\n", g_monitor_config.display == FX_DEVMON_DISP_16BIT ? "checked" : "");
-    offset += sprintf(temp_buffer + offset, "<td colspan=\"1\"><input type=\"radio\" name=\"VAL\" value=\"D\" %s>10进制</td>\r\n", g_monitor_config.value_format == FX_DEVMON_VAL_DECIMAL ? "checked" : "");
-    offset += sprintf(temp_buffer + offset, "<td colspan=\"1\"><input type=\"radio\" name=\"BITO\" value=\"0\" %s>0-F</td>\r\n", g_monitor_config.bit_order == FX_DEVMON_BIT_ORDER_0F ? "checked" : "");
-    offset += sprintf(temp_buffer + offset, "<td colspan=\"2\"></td>\r\n</tr>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<tr>\r\n<td colspan=\"1\"></td><td colspan=\"1\"><input type=\"radio\" name=\"FORM\" value=\"BT\" %s>位</td>\r\n", g_monitor_config.form == FX_DEVMON_FORM_BIT ? "checked" : "");
+    offset += HTML_PACK(temp_buffer, offset, "<td colspan=\"1\"><input type=\"radio\" name=\"DISP\" value=\"16\" %s>16位整数</td>\r\n", g_monitor_config.display == FX_DEVMON_DISP_16BIT ? "checked" : "");
+    offset += HTML_PACK(temp_buffer, offset, "<td colspan=\"1\"><input type=\"radio\" name=\"VAL\" value=\"D\" %s>10进制</td>\r\n", g_monitor_config.value_format == FX_DEVMON_VAL_DECIMAL ? "checked" : "");
+    offset += HTML_PACK(temp_buffer, offset, "<td colspan=\"1\"><input type=\"radio\" name=\"BITO\" value=\"0\" %s>0-F</td>\r\n", g_monitor_config.bit_order == FX_DEVMON_BIT_ORDER_0F ? "checked" : "");
+    offset += HTML_PACK(temp_buffer, offset, "<td colspan=\"2\"></td>\r\n</tr>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     
     /* 第九次打包: 配置选项行2 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"1\"></td><td colspan=\"1\"><input type=\"radio\" name=\"FORM\" value=\"WD\" %s>位＆字</td>\r\n", g_monitor_config.form == FX_DEVMON_FORM_WORD ? "checked" : "");
-    offset += sprintf(temp_buffer + offset, "<td colspan=\"1\"><input type=\"radio\" name=\"DISP\" value=\"32\" %s>32位整数</td>\r\n", g_monitor_config.display == FX_DEVMON_DISP_32BIT ? "checked" : "");
-    offset += sprintf(temp_buffer + offset, "<td colspan=\"1\"><input type=\"radio\" name=\"VAL\" value=\"H\" %s>16进制</td>\r\n", g_monitor_config.value_format == FX_DEVMON_VAL_HEX ? "checked" : "");
-    offset += sprintf(temp_buffer + offset, "<td colspan=\"1\"><input type=\"radio\" name=\"BITO\" value=\"F\" %s>F-0</td>\r\n", g_monitor_config.bit_order == FX_DEVMON_BIT_ORDER_F0 ? "checked" : "");
-    offset += sprintf(temp_buffer + offset, "<td colspan=\"2\"></td>\r\n</tr>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<tr>\r\n<td colspan=\"1\"></td><td colspan=\"1\"><input type=\"radio\" name=\"FORM\" value=\"WD\" %s>位＆字</td>\r\n", g_monitor_config.form == FX_DEVMON_FORM_WORD ? "checked" : "");
+    offset += HTML_PACK(temp_buffer, offset, "<td colspan=\"1\"><input type=\"radio\" name=\"DISP\" value=\"32\" %s>32位整数</td>\r\n", g_monitor_config.display == FX_DEVMON_DISP_32BIT ? "checked" : "");
+    offset += HTML_PACK(temp_buffer, offset, "<td colspan=\"1\"><input type=\"radio\" name=\"VAL\" value=\"H\" %s>16进制</td>\r\n", g_monitor_config.value_format == FX_DEVMON_VAL_HEX ? "checked" : "");
+    offset += HTML_PACK(temp_buffer, offset, "<td colspan=\"1\"><input type=\"radio\" name=\"BITO\" value=\"F\" %s>F-0</td>\r\n", g_monitor_config.bit_order == FX_DEVMON_BIT_ORDER_F0 ? "checked" : "");
+    offset += HTML_PACK(temp_buffer, offset, "<td colspan=\"2\"></td>\r\n</tr>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     
     /* 第八次打包: 配置选项行3和4 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"1\"></td><td colspan=\"1\"><input type=\"radio\" name=\"FORM\" value=\"B10\" %s>位(8/10点)</td>\r\n", g_monitor_config.form == FX_DEVMON_FORM_BIT_8_10 ? "checked" : "");
-    offset += sprintf(temp_buffer + offset, "<td colspan=\"1\"><input type=\"radio\" name=\"DISP\" value=\"REAL\" %s>实数(32位)</td>\r\n<td colspan=\"5\"></td>\r\n</tr>\r\n", g_monitor_config.display == FX_DEVMON_DISP_REAL ? "checked" : "");
-    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"2\"></td><td colspan=\"1\"><input type=\"radio\" name=\"DISP\" value=\"ASC\" %s>ASCII字符</td>\r\n<td colspan=\"5\"></td>\r\n</tr>\r\n", g_monitor_config.display == FX_DEVMON_DISP_ASCII ? "checked" : "");
+    offset += HTML_PACK(temp_buffer, offset, "<tr>\r\n<td colspan=\"1\"></td><td colspan=\"1\"><input type=\"radio\" name=\"FORM\" value=\"B10\" %s>位(8/10点)</td>\r\n", g_monitor_config.form == FX_DEVMON_FORM_BIT_8_10 ? "checked" : "");
+    offset += HTML_PACK(temp_buffer, offset, "<td colspan=\"1\"><input type=\"radio\" name=\"DISP\" value=\"REAL\" %s>实数(32位)</td>\r\n<td colspan=\"5\"></td>\r\n</tr>\r\n", g_monitor_config.display == FX_DEVMON_DISP_REAL ? "checked" : "");
+    offset += HTML_PACK(temp_buffer, offset, "<tr>\r\n<td colspan=\"2\"></td><td colspan=\"1\"><input type=\"radio\" name=\"DISP\" value=\"ASC\" %s>ASCII字符</td>\r\n<td colspan=\"5\"></td>\r\n</tr>\r\n", g_monitor_config.display == FX_DEVMON_DISP_ASCII ? "checked" : "");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     
     /* 第九次打包: 分页按钮和数据表格开始 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "</tbody></table><br>\r\n<table align=\"center\"><tbody>\r\n<tr><td><input type=\"submit\" name=\"PAGE_B\" value=\"上一页\" style=\"width:110;font-weight:bold\"></td>\r\n<td>&nbsp;</td>\r\n<td><input type=\"submit\" name=\"PAGE_B\" value=\"上一个\" style=\"width:110;font-weight:bold\"></td>\r\n<td>&nbsp;</td>\r\n<td><input type=\"submit\" name=\"PAGE_B\" value=\"下一个\" style=\"width:110;font-weight:bold\"></td>\r\n<td>&nbsp;</td>\r\n<td><input type=\"submit\" name=\"PAGE_B\" value=\"下一页\" style=\"width:110;font-weight:bold\"></td>\r\n</tr></tbody></table>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "</tbody></table><br>\r\n<table align=\"center\"><tbody>\r\n<tr><td><input type=\"submit\" name=\"PAGE_B\" value=\"上一页\" style=\"width:110;font-weight:bold\"></td>\r\n<td>&nbsp;</td>\r\n<td><input type=\"submit\" name=\"PAGE_B\" value=\"上一个\" style=\"width:110;font-weight:bold\"></td>\r\n<td>&nbsp;</td>\r\n<td><input type=\"submit\" name=\"PAGE_B\" value=\"下一个\" style=\"width:110;font-weight:bold\"></td>\r\n<td>&nbsp;</td>\r\n<td><input type=\"submit\" name=\"PAGE_B\" value=\"下一页\" style=\"width:110;font-weight:bold\"></td>\r\n</tr></tbody></table>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     
     /* 第十次打包: 数据表格 - 表头和部分数据行 */
@@ -1125,9 +1139,15 @@ void FX_DEVMON_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,  char *url)
 
     /* 第十七次打包: 数据表格 - 数据行31-32 + 结束标签和页脚 (使用公共组件) */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "</tbody>\r\n</table>\r\n</div>\r\n</div>\r\n</form>\r\n</body>\r\n</html>\r\n");
-    offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_FOOTER_NEW));
+    offset += HTML_PACK(temp_buffer, offset, "</tbody>\r\n</table>\r\n</div>\r\n</div>\r\n</form>\r\n</body>\r\n</html>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
+
+    /* 页脚(含 SX 自检脚本)直发：组件 >1.2KB，远超 HtmlBuffer 容量。
+     * 原来与收尾标签挤在同一包(约 1.27KB) -> 越界写穿 http_request / g_access_fifo
+     * (其 records 指针被 HTML 文本覆盖) -> 下一次 FX_ACCLOG_AddRecord() 取 conn_id
+     * 即 HardFault(mcause=4 未对齐取数, mtval 为文本字节)。 */
+    Data_Send(Dest_Sock, (uint8_t*)HTML_GetComponent(HTML_COMP_FOOTER_NEW),
+              strlen(HTML_GetComponent(HTML_COMP_FOOTER_NEW)));
       
     DEVMON_DEBUG("软元件监视页面流式发送完成\r\n");
 }

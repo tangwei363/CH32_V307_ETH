@@ -107,12 +107,15 @@ static void SX_Throttle(sx_stream_t *s)
 #if (SX_THROTTLE_MS > 0)
     Delay_Ms(SX_THROTTLE_MS);
 #endif
+    /* 喂狗：整页由几十个分包组成，若对端变慢，累计等待会超过 IWDG(3.2s) -> 复位 */
+    IWDG_ReloadCounter();
 
     if (++s->since_yield >= SX_YIELD_EVERY) {
         s->since_yield = 0;
 #if (SX_YIELD_MS > 0)
         Delay_Ms(SX_YIELD_MS);
 #endif
+        IWDG_ReloadCounter();
     }
 }
 
@@ -234,6 +237,11 @@ void SX_Send(u8 sock, const u8 *data, u32 len)
         s->chunks++;
 
         SX_Throttle(s);
+
+        /* 对端已断开(SX_RawSend 报超时)时，余下分包不再尝试 */
+        if (g_sx_tx_failed) {
+            break;
+        }
     }
 }
 

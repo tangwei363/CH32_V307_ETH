@@ -257,13 +257,13 @@ void FX_PLCINF_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,char *url)
     SendHttpHeader(Dest_Sock, PTYPE_HTML);
      /* 第一次打包: HTML头部到</head> (使用共享组件) */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, HTML_GetComponent(HTML_COMP_HEADER), "PLC信息");
+    offset += HTML_PACK(temp_buffer, offset, HTML_GetComponent(HTML_COMP_HEADER), "PLC信息");
     /* CSS 样式表直发：组件 >1.2KB，HtmlBuffer 装不下(越界会写穿 BSS 导致死机) */
     Data_Send(Dest_Sock, (uint8_t*)HTML_GetComponent(HTML_COMP_CSS_NEW),
               strlen(HTML_GetComponent(HTML_COMP_CSS_NEW)));
     /* 第二次打包: body开始到导航栏结束 (使用共享组件) */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_BODY_START_NEW));
+    offset += HTML_PACK(temp_buffer, offset, "%s", HTML_GetComponent(HTML_COMP_BODY_START_NEW));
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 
     /* 导航栏直发：组件约 0.9KB，同样超过 HtmlBuffer 容量 */
@@ -271,55 +271,58 @@ void FX_PLCINF_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,char *url)
               strlen(HTML_GetComponent(HTML_COMP_NAV_BAR_NEW)));
     /* 第四次打包: 内容区域开始和表单开始 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<div class=\"content\">\r\n");
-    offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_REFRESH));
-    offset += sprintf(temp_buffer + offset, "<form action=\"fx_plcinf.html\" method=\"post\">\r\n");
-    offset += sprintf(temp_buffer + offset, "<div style=\"text-align:center\"><font style=\"font-size=16px\"><b>PLC信息</b></font></div>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<div class=\"content\">\r\n");
+    /* 只有"监视执行中"才主动刷新；停止时不注入 meta refresh，改为被动 GET 刷新 */
+    if (net_monitor_state == FX_MONITOR_RUNNING) {
+        offset += HTML_PACK(temp_buffer, offset, "%s", HTML_GetComponent(HTML_COMP_REFRESH));
+    }
+    offset += HTML_PACK(temp_buffer, offset, "<form action=\"fx_plcinf.html\" method=\"post\">\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<div style=\"text-align:center\"><font style=\"font-size=16px\"><b>PLC信息</b></font></div>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     /* 第五次打包: PLC信息表格开始和标题行 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" style=\"table-layout:fixed; font-size:14px; margin:0 auto;\">\r\n");
-    offset += sprintf(temp_buffer + offset, "<tbody>\r\n");
-    offset += sprintf(temp_buffer + offset, "<tr><td width=\"20\"></td><td width=\"50\"></td><td width=\"10\"></td><td width=\"50\"></td><td width=\"10\"></td><td width=\"90\"></td><td width=\"200\"></td><td width=\"170\"></td><td width=\"80\"></td><td width=\"80\"></td></tr>\r\n");
-    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"7\">PLC信息</td><td colspan=\"1\" align=\"right\">状态 :&nbsp;</td><td colspan=\"2\">%s</td></tr>\r\n", monitor_status);
+    offset += HTML_PACK(temp_buffer, offset, "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" style=\"table-layout:fixed; font-size:14px; margin:0 auto;\">\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<tbody>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<tr><td width=\"20\"></td><td width=\"50\"></td><td width=\"10\"></td><td width=\"50\"></td><td width=\"10\"></td><td width=\"90\"></td><td width=\"200\"></td><td width=\"170\"></td><td width=\"80\"></td><td width=\"80\"></td></tr>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<tr><td colspan=\"7\">PLC信息</td><td colspan=\"1\" align=\"right\">状态 :&nbsp;</td><td colspan=\"2\">%s</td></tr>\r\n", monitor_status);
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     /* 第六次打包: CPU类型和CPU版本行 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"1\"></td><td colspan=\"5\">CPU类型</td><td colspan=\"1\" class=\"inf\" align=\"right\">%s</td><td colspan=\"1\"></td><td colspan=\"2\"><input type=\"submit\" name=\"CMD\" value=\"监视开始\" style=\"width:120;font-weight:bold\"></td></tr>\r\n", cpu_type_str);
-    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"1\"></td><td colspan=\"5\">CPU版本</td><td colspan=\"1\" class=\"inf\" align=\"right\">%d.%02d</td><td colspan=\"1\"></td><td colspan=\"2\"><input type=\"submit\" name=\"CMD\" value=\"监视停止\" style=\"width:120;font-weight:bold\"></td></tr>\r\n", (g_plc_info.cpu_version >> 8) & 0xFF, g_plc_info.cpu_version & 0xFF);
+    offset += HTML_PACK(temp_buffer, offset, "<tr><td colspan=\"1\"></td><td colspan=\"5\">CPU类型</td><td colspan=\"1\" class=\"inf\" align=\"right\">%s</td><td colspan=\"1\"></td><td colspan=\"2\"><input type=\"submit\" name=\"CMD\" value=\"监视开始\" style=\"width:120;font-weight:bold\"></td></tr>\r\n", cpu_type_str);
+    offset += HTML_PACK(temp_buffer, offset, "<tr><td colspan=\"1\"></td><td colspan=\"5\">CPU版本</td><td colspan=\"1\" class=\"inf\" align=\"right\">%d.%02d</td><td colspan=\"1\"></td><td colspan=\"2\"><input type=\"submit\" name=\"CMD\" value=\"监视停止\" style=\"width:120;font-weight:bold\"></td></tr>\r\n", (g_plc_info.cpu_version >> 8) & 0xFF, g_plc_info.cpu_version & 0xFF);
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     /* 第七次打包: 存储器类型和电池模式行 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"1\"></td><td colspan=\"5\">存储器类型</td><td colspan=\"1\" class=\"inf\" align=\"right\">%s</td><td colspan=\"3\"></td></tr>\r\n", mem_type_str);
-    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"1\"></td><td colspan=\"5\">无电池模式</td><td colspan=\"1\" class=\"inf\" align=\"right\">%s</td><td colspan=\"3\"></td></tr>\r\n", battery_mode_str);
+    offset += HTML_PACK(temp_buffer, offset, "<tr><td colspan=\"1\"></td><td colspan=\"5\">存储器类型</td><td colspan=\"1\" class=\"inf\" align=\"right\">%s</td><td colspan=\"3\"></td></tr>\r\n", mem_type_str);
+    offset += HTML_PACK(temp_buffer, offset, "<tr><td colspan=\"1\"></td><td colspan=\"5\">无电池模式</td><td colspan=\"1\" class=\"inf\" align=\"right\">%s</td><td colspan=\"3\"></td></tr>\r\n", battery_mode_str);
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     /* 第八次打包: 日期和时间行 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"1\"></td><td colspan=\"5\">年月日</td><td colspan=\"1\" class=\"inf\" align=\"right\">%04d-%02d-%02d</td><td colspan=\"3\"></td></tr>\r\n", calendar.w_year, calendar.w_month, calendar.w_date);
-    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"1\"></td><td colspan=\"5\">时间</td><td colspan=\"1\" class=\"inf\" align=\"right\">%02d:%02d:%02d</td><td colspan=\"3\"></td></tr>\r\n", calendar.hour, calendar.min, calendar.sec);
+    offset += HTML_PACK(temp_buffer, offset, "<tr><td colspan=\"1\"></td><td colspan=\"5\">年月日</td><td colspan=\"1\" class=\"inf\" align=\"right\">%04d-%02d-%02d</td><td colspan=\"3\"></td></tr>\r\n", calendar.w_year, calendar.w_month, calendar.w_date);
+    offset += HTML_PACK(temp_buffer, offset, "<tr><td colspan=\"1\"></td><td colspan=\"5\">时间</td><td colspan=\"1\" class=\"inf\" align=\"right\">%02d:%02d:%02d</td><td colspan=\"3\"></td></tr>\r\n", calendar.hour, calendar.min, calendar.sec);
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     // /* 第九次打包: LED状态行 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"10\">&nbsp;</td></tr>\r\n");
-    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"10\">LED状态</td></tr>\r\n");
-    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"1\"></td><td colspan=\"1\" align=\"right\">POWER</td><td colspan=\"1\"></td><td colspan=\"1\" class=\"%s\">&nbsp;</td><td colspan=\"6\"></td></tr>\r\n", FX_PLCINF_LEDClass(g_plc_info.led_power));
-    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"1\"></td><td colspan=\"1\" align=\"right\">RUN</td><td colspan=\"1\"></td><td colspan=\"1\" class=\"%s\">&nbsp;</td><td colspan=\"6\"></td></tr>\r\n", FX_PLCINF_LEDClass(g_plc_info.led_run));
-    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"1\"></td><td colspan=\"1\" align=\"right\">BATT</td><td colspan=\"1\"></td><td colspan=\"1\" class=\"%s\">&nbsp;</td><td colspan=\"6\"></td></tr>\r\n", FX_PLCINF_LEDClass(g_plc_info.led_batt));
-    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"1\"></td><td colspan=\"1\" align=\"right\">ERROR</td><td colspan=\"1\"></td><td colspan=\"1\" class=\"%s\">&nbsp;</td><td colspan=\"6\"></td></tr>\r\n", FX_PLCINF_LEDClass(g_plc_info.led_error));
+    offset += HTML_PACK(temp_buffer, offset, "<tr><td colspan=\"10\">&nbsp;</td></tr>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<tr><td colspan=\"10\">LED状态</td></tr>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<tr><td colspan=\"1\"></td><td colspan=\"1\" align=\"right\">POWER</td><td colspan=\"1\"></td><td colspan=\"1\" class=\"%s\">&nbsp;</td><td colspan=\"6\"></td></tr>\r\n", FX_PLCINF_LEDClass(g_plc_info.led_power));
+    offset += HTML_PACK(temp_buffer, offset, "<tr><td colspan=\"1\"></td><td colspan=\"1\" align=\"right\">RUN</td><td colspan=\"1\"></td><td colspan=\"1\" class=\"%s\">&nbsp;</td><td colspan=\"6\"></td></tr>\r\n", FX_PLCINF_LEDClass(g_plc_info.led_run));
+    offset += HTML_PACK(temp_buffer, offset, "<tr><td colspan=\"1\"></td><td colspan=\"1\" align=\"right\">BATT</td><td colspan=\"1\"></td><td colspan=\"1\" class=\"%s\">&nbsp;</td><td colspan=\"6\"></td></tr>\r\n", FX_PLCINF_LEDClass(g_plc_info.led_batt));
+    offset += HTML_PACK(temp_buffer, offset, "<tr><td colspan=\"1\"></td><td colspan=\"1\" align=\"right\">ERROR</td><td colspan=\"1\"></td><td colspan=\"1\" class=\"%s\">&nbsp;</td><td colspan=\"6\"></td></tr>\r\n", FX_PLCINF_LEDClass(g_plc_info.led_error));
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     /* 第十次打包: 表格结束和隐藏字段 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "</tbody>\r\n");
-    offset += sprintf(temp_buffer + offset, "</table>\r\n");
-    offset += sprintf(temp_buffer + offset, "<input type=\"hidden\" name=\"LANG\" value=\"ZS\">\r\n");
-    offset += sprintf(temp_buffer + offset, "</form>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "</tbody>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "</table>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<input type=\"hidden\" name=\"LANG\" value=\"ZS\">\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "</form>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 
     /* 第十一次打包: 错误信息表格标题 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" bgcolor=\"#ffffff\" style=\"margin:0 auto;\">\r\n");
-    offset += sprintf(temp_buffer + offset, "<tbody><tr><td bgcolor=\"#cccccc\">错误信息</td></tr></tbody>\r\n");
-    offset += sprintf(temp_buffer + offset, "</table>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" bgcolor=\"#ffffff\" style=\"margin:0 auto;\">\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<tbody><tr><td bgcolor=\"#cccccc\">错误信息</td></tr></tbody>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "</table>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 
     /* 第十二次打包: 生成并发送错误表格 */
@@ -328,11 +331,17 @@ void FX_PLCINF_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,char *url)
 
     /* 打包: 页面尾部 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "</div>\r\n");
-    offset += sprintf(temp_buffer + offset, "</div>\r\n");
-    offset += sprintf(temp_buffer + offset, "</body>\r\n</html>\r\n");
-    offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_FOOTER_NEW));
+    offset += HTML_PACK(temp_buffer, offset, "</div>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "</div>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "</body>\r\n</html>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
+
+    /* 页脚(含 SX 自检脚本)直发：组件 >1.2KB，远超 HtmlBuffer 容量。
+     * 原来与收尾标签挤在同一包(约 1.27KB) -> 越界写穿 http_request / g_access_fifo
+     * (其 records 指针被 HTML 文本覆盖) -> 下一次 FX_ACCLOG_AddRecord() 取 conn_id
+     * 即 HardFault(mcause=4 未对齐取数, mtval 为文本字节)。 */
+    Data_Send(Dest_Sock, (uint8_t*)HTML_GetComponent(HTML_COMP_FOOTER_NEW),
+              strlen(HTML_GetComponent(HTML_COMP_FOOTER_NEW)));
 
     printf("PLC信息页面流式发送完成\r\n");
 }

@@ -1690,7 +1690,7 @@ int  Analysis_eth_frame_handler(uint8_t Sour_Sock ,uint8_t  Dest_Sock,
         case PRO_TCP_HTTP :       // = 0xA8           //TCP 数据监控
         {
             #if SOCKET_HTTP_EN
-            //ETHERNET_DEBUG(" TCP 数据监控 \r\n" );
+            ETHERNET_DEBUG(" TCP 数据监控 \r\n" );
             Web_Server(Sour_Sock, Dest_Sock, frame_buff, frame_len );
             #endif
         }break;

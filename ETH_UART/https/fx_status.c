@@ -189,7 +189,7 @@ void FX_STATUS_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock, char *url)
 
     /* 第一次打包: HTML头部(约0.3KB) —— CSS 改为直发，见下 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, HTML_GetComponent(HTML_COMP_HEADER), "通信状态");
+    offset += HTML_PACK(temp_buffer, offset, HTML_GetComponent(HTML_COMP_HEADER), "通信状态");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 
     /* CSS 样式表：组件本身 >1.2KB，而 HtmlBuffer 仅 HTML_LEN(768) 字节，
@@ -200,7 +200,7 @@ void FX_STATUS_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock, char *url)
 
     /* 第二次打包: body开始标签 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_BODY_START_NEW));
+    offset += HTML_PACK(temp_buffer, offset, "%s", HTML_GetComponent(HTML_COMP_BODY_START_NEW));
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 
     /* 导航栏：组件约 0.9KB，同样超过 HtmlBuffer 容量，改为直发 */
@@ -209,53 +209,56 @@ void FX_STATUS_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock, char *url)
 
     /* 第四次打包: 内容区域开始和表单开始 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<div class=\"content\">\r\n<br>\r\n");
-    offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_REFRESH));
-    offset += sprintf(temp_buffer + offset, "<form action=\"fx_status.html\" method=\"post\">\r\n");
-    offset += sprintf(temp_buffer + offset, "<font style=\"font-size=16px\"><b>通信状态</b></font>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<div class=\"content\">\r\n<br>\r\n");
+    /* 只有"监视执行中"才主动刷新；停止时不注入 meta refresh，改为被动 GET 刷新 */
+    if (net_monitor_state == FX_MONITOR_RUNNING) {
+        offset += HTML_PACK(temp_buffer, offset, "%s", HTML_GetComponent(HTML_COMP_REFRESH));
+    }
+    offset += HTML_PACK(temp_buffer, offset, "<form action=\"fx_status.html\" method=\"post\">\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<font style=\"font-size=16px\"><b>通信状态</b></font>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 
     /* 第五次打包: 适配器信息开始和状态行 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" style=\"table-layout:fixed; font-size:14px\">\r\n");
-    offset += sprintf(temp_buffer + offset, "<tbody>\r\n");
-    offset += sprintf(temp_buffer + offset, "<tr><td width=\"20\"></td><td width=\"50\"></td><td width=\"20\"></td><td width=\"140\"></td><td width=\"200\"></td><td width=\"170\"></td><td width=\"80\"></td><td width=\"80\"></td></tr>\r\n");
-    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"5\">以太网适配器信息</td><td colspan=\"1\" align=\"right\">状态 :&nbsp;</td><td colspan=\"2\">%s</td></tr>\r\n", monitor_status);
+    offset += HTML_PACK(temp_buffer, offset, "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" style=\"table-layout:fixed; font-size:14px\">\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<tbody>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<tr><td width=\"20\"></td><td width=\"50\"></td><td width=\"20\"></td><td width=\"140\"></td><td width=\"200\"></td><td width=\"170\"></td><td width=\"80\"></td><td width=\"80\"></td></tr>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<tr><td colspan=\"5\">以太网适配器信息</td><td colspan=\"1\" align=\"right\">状态 :&nbsp;</td><td colspan=\"2\">%s</td></tr>\r\n", monitor_status);
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 
     /* 第六次打包: IP地址行 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"1\"></td><td colspan=\"3\">IP地址</td><td colspan=\"1\" class=\"inf\" align=\"right\">%d.%d.%d.%d</td><td colspan=\"1\"></td><td colspan=\"2\"><input type=\"submit\" name=\"CMD\" value=\"监视开始\" style=\"width:120;font-weight:bold\"></td></tr>\r\n",
+    offset += HTML_PACK(temp_buffer, offset, "<tr><td colspan=\"1\"></td><td colspan=\"3\">IP地址</td><td colspan=\"1\" class=\"inf\" align=\"right\">%d.%d.%d.%d</td><td colspan=\"1\"></td><td colspan=\"2\"><input type=\"submit\" name=\"CMD\" value=\"监视开始\" style=\"width:120;font-weight:bold\"></td></tr>\r\n",
              Basic_CfgBuf.ip[0], Basic_CfgBuf.ip[1], Basic_CfgBuf.ip[2], Basic_CfgBuf.ip[3]);
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 
     /* 第七次打包: 子网掩码行 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"1\"></td><td colspan=\"3\">子网掩码类型</td><td colspan=\"1\" class=\"inf\" align=\"right\">%d.%d.%d.%d</td><td colspan=\"1\"></td><td colspan=\"2\"><input type=\"submit\" name=\"CMD\" value=\"监视停止\" style=\"width:120;font-weight:bold\"></td></tr>\r\n",
+    offset += HTML_PACK(temp_buffer, offset, "<tr><td colspan=\"1\"></td><td colspan=\"3\">子网掩码类型</td><td colspan=\"1\" class=\"inf\" align=\"right\">%d.%d.%d.%d</td><td colspan=\"1\"></td><td colspan=\"2\"><input type=\"submit\" name=\"CMD\" value=\"监视停止\" style=\"width:120;font-weight:bold\"></td></tr>\r\n",
              Basic_CfgBuf.mask[0], Basic_CfgBuf.mask[1], Basic_CfgBuf.mask[2], Basic_CfgBuf.mask[3]);
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 
     /* 第八次打包: 网关和MAC地址行 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"1\"></td><td colspan=\"3\">默认路由器IP地址</td><td colspan=\"1\" class=\"inf\" align=\"right\">%d.%d.%d.%d</td><td colspan=\"3\"></td></tr>\r\n",
+    offset += HTML_PACK(temp_buffer, offset, "<tr><td colspan=\"1\"></td><td colspan=\"3\">默认路由器IP地址</td><td colspan=\"1\" class=\"inf\" align=\"right\">%d.%d.%d.%d</td><td colspan=\"3\"></td></tr>\r\n",
              Basic_CfgBuf.gateway[0], Basic_CfgBuf.gateway[1], Basic_CfgBuf.gateway[2], Basic_CfgBuf.gateway[3]);
-    offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"1\"></td><td colspan=\"3\">以太网地址</td><td colspan=\"1\" class=\"inf\" align=\"right\">%02X%02X.%02X%02X.%02X%02X</td><td colspan=\"3\"></td></tr>\r\n",
+    offset += HTML_PACK(temp_buffer, offset, "<tr><td colspan=\"1\"></td><td colspan=\"3\">以太网地址</td><td colspan=\"1\" class=\"inf\" align=\"right\">%02X%02X.%02X%02X.%02X%02X</td><td colspan=\"3\"></td></tr>\r\n",
              Basic_CfgBuf.mac[0], Basic_CfgBuf.mac[1], Basic_CfgBuf.mac[2], Basic_CfgBuf.mac[3], Basic_CfgBuf.mac[4], Basic_CfgBuf.mac[5]);
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 
     /* 第九次打包: 表格结束和表单结束 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "</tbody>\r\n");
-    offset += sprintf(temp_buffer + offset, "</table>\r\n");
-    offset += sprintf(temp_buffer + offset, "<input type=\"hidden\" name=\"LANG\" value=\"ZS\">\r\n");
-    offset += sprintf(temp_buffer + offset, "</form>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "</tbody>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "</table>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<input type=\"hidden\" name=\"LANG\" value=\"ZS\">\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "</form>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 
     /* 第十次打包: 连接状态表格标题 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\">\r\n");
-    offset += sprintf(temp_buffer + offset, "<tbody><tr><td colspan=\"5\" style=\"font-size:14px\">各连接状态</td><td colspan=\"3\"></td></tr></tbody>\r\n");
-    offset += sprintf(temp_buffer + offset, "</table>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\">\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<tbody><tr><td colspan=\"5\" style=\"font-size:14px\">各连接状态</td><td colspan=\"3\"></td></tr></tbody>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "</table>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 
     /* 第十一次打包: 生成并发送连接表格 */
@@ -264,25 +267,31 @@ void FX_STATUS_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock, char *url)
 
     /* 第十二次打包: 协议统计表格 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\">\r\n");
-    offset += sprintf(temp_buffer + offset, "<tbody><tr><td colspan=\"5\" style=\"font-size:14px\">各协议状态</td><td colspan=\"3\"></td></tr></tbody>\r\n");
-    offset += sprintf(temp_buffer + offset, "</table>\r\n");
-    offset += sprintf(temp_buffer + offset, "<table border=\"1\" cellspacing=\"1\">\r\n");
-    offset += sprintf(temp_buffer + offset, "<tbody><tr><td><table border=\"1\" cellspacing=\"0\" bgcolor=\"#ffffff\" style=\"text-align:center;font-size:14px\">\r\n");
-    offset += sprintf(temp_buffer + offset, "<tbody><tr bgcolor=\"#cccccc\"><td width=\"330\">&nbsp;</td><td width=\"230\">TCP数据包</td><td width=\"230\">UDP数据包</td></tr>\r\n");
-    offset += sprintf(temp_buffer + offset, "<tr><td height=\"24\" class=\"ct\">接收总数</td><td>%u</td><td>%u</td></tr>\r\n", g_protocol_stats.tcp_rx_packets, g_protocol_stats.udp_rx_packets);
-    offset += sprintf(temp_buffer + offset, "<tr><td height=\"24\" class=\"ct\">发送总数</td><td>%u</td><td>%u</td></tr>\r\n", g_protocol_stats.tcp_tx_packets, g_protocol_stats.udp_tx_packets);
-    offset += sprintf(temp_buffer + offset, "</tbody></table></td></tr></tbody>\r\n");
-    offset += sprintf(temp_buffer + offset, "</table>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\">\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<tbody><tr><td colspan=\"5\" style=\"font-size:14px\">各协议状态</td><td colspan=\"3\"></td></tr></tbody>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "</table>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<table border=\"1\" cellspacing=\"1\">\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<tbody><tr><td><table border=\"1\" cellspacing=\"0\" bgcolor=\"#ffffff\" style=\"text-align:center;font-size:14px\">\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<tbody><tr bgcolor=\"#cccccc\"><td width=\"330\">&nbsp;</td><td width=\"230\">TCP数据包</td><td width=\"230\">UDP数据包</td></tr>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "<tr><td height=\"24\" class=\"ct\">接收总数</td><td>%u</td><td>%u</td></tr>\r\n", g_protocol_stats.tcp_rx_packets, g_protocol_stats.udp_rx_packets);
+    offset += HTML_PACK(temp_buffer, offset, "<tr><td height=\"24\" class=\"ct\">发送总数</td><td>%u</td><td>%u</td></tr>\r\n", g_protocol_stats.tcp_tx_packets, g_protocol_stats.udp_tx_packets);
+    offset += HTML_PACK(temp_buffer, offset, "</tbody></table></td></tr></tbody>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "</table>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 
     /* 打包: 页面尾部 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "</div>\r\n");
-    offset += sprintf(temp_buffer + offset, "</div>\r\n");
-    offset += sprintf(temp_buffer + offset, "</body>\r\n</html>\r\n");
-    offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_FOOTER_NEW));
+    offset += HTML_PACK(temp_buffer, offset, "</div>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "</div>\r\n");
+    offset += HTML_PACK(temp_buffer, offset, "</body>\r\n</html>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
+
+    /* 页脚(含 SX 自检脚本)直发：组件 >1.2KB，远超 HtmlBuffer 容量。
+     * 原来与收尾标签挤在同一包(约 1.27KB) -> 越界写穿 http_request / g_access_fifo
+     * (其 records 指针被 HTML 文本覆盖) -> 下一次 FX_ACCLOG_AddRecord() 取 conn_id
+     * 即 HardFault(mcause=4 未对齐取数, mtval 为文本字节)。 */
+    Data_Send(Dest_Sock, (uint8_t*)HTML_GetComponent(HTML_COMP_FOOTER_NEW),
+              strlen(HTML_GetComponent(HTML_COMP_FOOTER_NEW)));
 
     printf("通信状态页面流式发送完成\r\n");
 }

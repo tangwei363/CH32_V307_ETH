@@ -63,6 +63,17 @@ void Basic_Int(void)
     BSP_DEBUG("SystemClk:%d\r\n", SystemCoreClock);
     BSP_DEBUG("ChipID:%08x\r\n", DBGMCU_GetCHIPID());
 
+    /* ★ 复位原因：定位"无故重启"必看(1=IWDG看门狗 2=上电 4=软件 8=外部引脚) */
+    {
+        u8 rst = 0;
+        if (RCC_GetFlagStatus(RCC_FLAG_IWDGRST) != RESET) rst |= 0x01;
+        if (RCC_GetFlagStatus(RCC_FLAG_PORRST)  != RESET) rst |= 0x02;
+        if (RCC_GetFlagStatus(RCC_FLAG_SFTRST)  != RESET) rst |= 0x04;
+        if (RCC_GetFlagStatus(RCC_FLAG_PINRST)  != RESET) rst |= 0x08;
+        BSP_DEBUG("Reset cause: 0x%02X (1=IWDG 2=POR 4=SW 8=PIN)\r\n", rst);
+        RCC_ClearFlag();
+    }
+
     //Read configuration information
     BSP_FLASH_READ( BASIC_CFG_ADDR, (u8 *)&Basic_CfgBuf, BASIC_CFG_LEN );             
     BSP_FLASH_READ( PORT_CFG_ADDR, (u8 *)&Port_CfgBuf, PORT_CFG_LEN );

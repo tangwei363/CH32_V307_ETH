@@ -17,7 +17,7 @@
 #include "wchnet.h"
 #include "bsp_flash.h"
 /* USER CODE END Private defines */
-//#define _HTTPS_DEBUG            //日志模块 开关，注释掉将关闭日志输出
+#define _HTTPS_DEBUG            //日志模块 开关，注释掉将关闭日志输出
 
 #ifdef _HTTPS_DEBUG
     #define HTTPS_DEBUG(format, ...)  printf (format, ##__VA_ARGS__)
@@ -62,7 +62,37 @@
 
 #define RES_END "\r\n\r\n"
 
-#define HTML_LEN     1024                         //Maximum size of a single web page(1024→768: 大页面走chunked流式, 此处仅作片段暂存)
+/* ★ 分包缓冲容量约束（重要）：
+ *   HtmlBuffer[HTML_LEN] 是各页 sprintf 打包用的共享缓冲，没有运行时边界检查。
+ *   某一包一旦超出 HTML_LEN 就会写穿紧随其后的 http_request / g_access_fifo /
+ *   g_access_logs（BSS 相邻全局），现象是"页面能显示，随后 HardFault"。
+ *   因此：
+ *     1) 任何 >800B 的静态组件（CSS 约 1.9KB、导航栏约 0.8KB、页脚约 1.2KB）
+ *        必须绕过缓冲区直接 Data_Send，禁止再 sprintf 进 HtmlBuffer；
+ *     2) 页面内容分包用发送阈值保证单包远小于 HTML_LEN
+ *        （如 FX_DEVMON_SendDataRows 的行累积阈值 450B）。
+ *   历史故障：页脚(1231B)+收尾标签同包约 1271B -> 写穿 g_access_fifo 的
+ *   records 指针 -> 下次记录访问履历时 HardFault(mcause=4 未对齐取数)。 */
+#define HTML_LEN     1024
+
+/* ★ 分包打包（带容量校验）——替代页面里的 sprintf(temp_buffer + offset, ...)
+ *
+ * 用法与 sprintf 一致，只是第一个参数改为"缓冲区 + 当前偏移"：
+ *      offset += HTML_PACK(temp_buffer, offset, "<td>%d</td>", value);
+ *
+ * 与 sprintf 的三点区别，也是加它的原因：
+ *   1) 写入前先校验剩余空间，最多写到 cap-1，绝不写穿 BSS 中相邻的
+ *      http_request / g_access_fifo / g_access_logs（历史两次 HardFault 根因）；
+ *   2) 一旦发生截断立即 printf 告警（所需/剩余字节数与当前偏移），
+ *      把"静默炸内存"变成"串口日志可见的渲染截断"；
+ *   3) 返回值恒为"实际写入字节数"，因此 offset 永远不会 >= cap。
+ *
+ * 容量用 HTML_LEN（HtmlBuffer[HTML_LEN] 的定义值，见 HTTPS.c）。
+ */
+#define HTML_PACK(buf, off, ...) \
+    Html_PackChk((buf), (uint32_t)(off), (uint32_t)HTML_LEN, __VA_ARGS__)
+
+uint32_t Html_PackChk(char *buf, uint32_t off, uint32_t cap, const char *fmt, ...);                         //Maximum size of a single web page(1024→768: 大页面走chunked流式, 此处仅作片段暂存)
 
 typedef struct _st_http_request                 //Browser request information
 {

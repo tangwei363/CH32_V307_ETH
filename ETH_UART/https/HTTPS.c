@@ -16,6 +16,7 @@
 #include "sx_stream.h"
 
 #include <ctype.h>
+#include <stdarg.h>   /* HTML_PACK: vsnprintf/va_list */
 
 #include "bsp_uart.h"
 #include "bsp_wch_net.h"
@@ -34,7 +35,60 @@ st_http_request http_request;
 
 u8 *name;                                               //The name of the web page requested by HTTP
 
-char HtmlBuffer[HTML_LEN];                              //Web page send buffer
+char HtmlBuffer[HTML_LEN];
+
+/* ★ 本次响应是否已出现发送失败(对端断开)：由 SX_RawSend 置位，
+ *   SX_Send 的分包循环据此提前放弃剩余分包，避免整页几十包都空转重试。 */
+u8 g_sx_tx_failed = 0;                              //Web page send buffer
+
+/* 编译期确认宏里的容量常量与缓冲区实际尺寸一致（防止将来只改一处） */
+typedef char HTML_Assert_Buffer_Size_Matches_HTML_LEN[
+    (sizeof(HtmlBuffer) == (unsigned)HTML_LEN) ? 1 : -1];
+
+/**
+ * @brief 向缓冲区追加格式化文本（带容量校验），供 HTML_PACK 宏调用
+ * @param buf 目标缓冲区（通常是 HtmlBuffer）
+ * @param off 当前写入偏移
+ * @param cap 缓冲区总容量
+ * @param fmt 格式化串，其余参数同 printf
+ * @return 实际写入的字节数（0 表示空间不足/格式化失败；offset 不会超过 cap）
+ *
+ * @note 与 sprintf 的差别：空间不足时只写入能容纳的部分并打印告警，
+ *       不做越界写入 —— 保证不会破坏 BSS 中紧邻 HtmlBuffer 的全局变量。
+ */
+uint32_t Html_PackChk(char *buf, uint32_t off, uint32_t cap, const char *fmt, ...)
+{
+    va_list ap;
+    int need;
+    uint32_t space;
+
+    if (buf == NULL || fmt == NULL || cap == 0u) {
+        return 0;
+    }
+    if (off >= cap) {
+        printf("HTML_PACK 越界: off=%u cap=%u, 该包剩余内容已丢弃\r\n",
+               (unsigned)off, (unsigned)cap);
+        return 0;
+    }
+
+    space = cap - off;
+    va_start(ap, fmt);
+    need = vsnprintf(buf + off, space, fmt, ap);
+    va_end(ap);
+
+    if (need < 0) {
+        buf[off] = '\0';
+        printf("HTML_PACK 格式化失败: off=%u\r\n", (unsigned)off);
+        return 0;
+    }
+    if ((uint32_t)need >= space) {
+        /* 被截断：保留 space-1 字节 + 结尾 0 */
+        printf("HTML_PACK 截断: 需要 %u 字节, 仅剩 %u (off=%u cap=%u)\r\n",
+               (unsigned)need, (unsigned)space, (unsigned)off, (unsigned)cap);
+        return space - 1u;
+    }
+    return (uint32_t)need;
+}
 
 /*********************************************************************
  * @fn      GetHtmlBuffer
@@ -286,6 +340,7 @@ void SendHttpHeader(u8 socket_id, char type)
      * Content-Length 的裸流式响应会让浏览器无法判断响应结束（一直转圈）。
      * 页面发送完毕后，由 Web_Server / Web_Usart_Handler 调用 SX_End() 收尾。
      */
+    g_sx_tx_failed = 0;   /* 新响应开始，清除上一轮的发送失败标志 */
     SX_Begin(socket_id, type, SX_PAGE_UNKNOWN);
 }
 
@@ -942,7 +997,8 @@ void SX_RawSend(u8 id, const uint8_t *dataptr, uint32_t datalen)
     #if NET_LED_ENABLE == 1
     NEN_TX_LED_Trigger();  // 触发发送LED闪烁
     #endif
-    while(totallen > 0){
+    while (totallen > 0)
+    {
         len = totallen;
         // 发送数据
         sent = len;
@@ -959,10 +1015,14 @@ void SX_RawSend(u8 id, const uint8_t *dataptr, uint32_t datalen)
         } else {
             // 发送失败或缓冲区满，减少超时计数
             if(--timeout == 0) {
-                HTTPS_DEBUG("SX_RawSend timeout, remaining=%d\n", totallen);
+                //HTTPS_DEBUG("SX_RawSend timeout, remaining=%d\n", totallen);
+                g_sx_tx_failed = 1;   /* 标记：对端已发不出去，后续分包不必再试 */
                 break;
             }
             Delay_Ms(1);  // 等待1ms后重试
+            IWDG_ReloadCounter();   /* 发送重试期间喂狗：大页面(几十个分包)每个分包最多重试
+                                     * 50 x 1ms，累计会超过 IWDG(3.2s) -> 复位。重试次数
+                                     * 有上限(50)，因此不会掩盖真正的死循环。 */
         }
     }
 }
@@ -1400,9 +1460,7 @@ void Web_Server(uint8_t Sour_Sock ,uint8_t  Dest_Sock, uint8_t *socket_buffer,ui
             {
                 name = http_request.URL;
                 ParseURLType(&http_request.TYPE, name);
-
                 HTTPS_DEBUG("POST \r\n");
-
                 /* 三菱FX3U-ENET-ADP HTTP页面 - POST请求处理 */
                 if(strstr(name, "fx_status.html") != NULL || strstr(name, "fx_status") != NULL) {
                     HTTPS_HandleMonitorCmd((char*)socket_buffer);
@@ -1425,6 +1483,7 @@ void Web_Server(uint8_t Sour_Sock ,uint8_t  Dest_Sock, uint8_t *socket_buffer,ui
                 else if(strstr(name, "fx_devmon.html") != NULL || strstr(name, "fx_devmon") != NULL) {
                     //MONT=D&DEVT=D&DEVN=0&CMD=%BC%E0%CA%D3%BF%AA%CA%BC&MDL=0&BFMN=0&BFMV=10%BD%F8%D6%C6&INT=5&DISP=16&VAL=D&FORM=WD&BITO=F
                     FX_DEVMON_METHOD_POST(Sour_Sock,Dest_Sock, (char*)socket_buffer);
+                    FX_DEVMON_SendWebPage(Sour_Sock, Dest_Sock, (char*)name, 1);   /* 表单提交后渲染新配置 */
            
                     current_page = HTML_PAGE_DEVMON;  /* 标记页面已处理 */
                 }
@@ -1477,10 +1536,11 @@ void Web_Server(uint8_t Sour_Sock ,uint8_t  Dest_Sock, uint8_t *socket_buffer,ui
                     current_page = HTML_PAGE_ACCLOG;  /* 标记页面已处理 */
                 }
                 else if( strstr(name, "fx_devmon") != NULL) {
-                    //FX_DEVMON_SendWebPage(Sour_Sock,Dest_Sock, (char*)name);
-                    // 发送指令获取状态 :更新监视器配置
-                    FX_DEVMON_UpdateMonitor_CMD(Sour_Sock, Dest_Sock);
-                    //HTTPS_DEBUG("fx_devmon.html 流式发送完成\r\n");
+                    /* 浏览器路径：直接渲染(fetch_data=1)，渲染内部会发起一次批量读；
+                     * 回帧到达后由 Web_Usart_Handler 用 fetch_data=0 再渲染一次以显示新数据。 */
+                    FX_DEVMON_SendWebPage(Sour_Sock, Dest_Sock, (char *)name,
+                                          1);
+                    HTTPS_DEBUG("fx_devmon.html 流式发送完成\r\n");
                     current_page = HTML_PAGE_DEVMON ;  /* 标记页面已处理 */
                 }
                 else if( strstr(name, "index") != NULL ||  strstr(name, "HTTP") != NULL) {
@@ -1569,26 +1629,27 @@ void Web_Usart_Handler(uint8_t Sour_Sock ,uint8_t  Dest_Sock, uint8_t *buffer,ui
              *   跳过 STX(buffer+1)，ASCII→二进制，字节数 = (帧长-4)/2。
              * 解码缓冲复用 HtmlBuffer（紧随其后的 SendWebPage 会重新填充，二者不冲突）。 */
             if (lend > 4u) {
+                /* 独立解码缓冲：以前解码进 HtmlBuffer，而它正是页面渲染使用的同一块
+                 * 缓冲 -- 回帧若在渲染途中到达，会把已打包好的页面内容覆盖成二进制数据
+                 * (浏览器收到乱码后可能中断连接 -> 后续分包发送反复重试 -> 看门狗复位)。 */
+                static uint8_t s_plc_data[256];
                 uint16_t dlen = (uint16_t)((lend - 4u) / 2u);
                 dlen &= 0xFFFEu;                              /* 该转换要求长度为偶数 */
-                if (dlen > (uint16_t)(HTML_LEN - 2u)) {
-                    dlen = (uint16_t)(HTML_LEN - 2u);         /* 防超长帧越界 */
+                if (dlen > (uint16_t)sizeof(s_plc_data)) {
+                    dlen = (uint16_t)sizeof(s_plc_data);      /* 防超长帧越界 */
                 }
                 if (dlen >= 2u) {
-                    hex_str_to_intlend(buffer + 1, dlen, (uint8_t*)HtmlBuffer);
-                    FX_DEVMON_UpdateMonitor_Data((u8*)HtmlBuffer, dlen); // 更新监控数据
+                    hex_str_to_intlend(buffer + 1, dlen, s_plc_data);
+                    FX_DEVMON_UpdateMonitor_Data(s_plc_data, dlen);   /* 与渲染缓冲彻底隔离 */
                 }
             }
-            // 显示网页:发送网页数据.
-            if (SX_Active(Dest_Sock)) {
-                /* 该 socket 正在流式发送本页(浏览器请求触发的这一遍)，
-                 * 此时再发一遍会 SendHttpHeader -> SX_Begin -> SX_Abort 掉在途的流，
-                 * 页面就会在表格中部被截断(表现为表格底线与页脚不显示)。
-                 * 数据已在上面更新，本轮不再重发，等浏览器按刷新间隔再次请求。 */
-                HTTPS_DEBUG("devmon page streaming, skip resend\r\n");
-                break;
-            }
-            FX_DEVMON_SendWebPage(Sour_Sock,Dest_Sock, (char*)buffer);
+            /* ★ 回帧路径只更新数据，不再重发页面。
+             * 现场日志证实：浏览器请求触发的响应发完(SX_End)后连接随即关闭，
+             * 此时再对同一 socket 发第二个响应，WCHNET_SocketSend 恒返回 0，
+             * 于是每个分包都要空转 50 次重试(日志: SX_RawSend timeout, remaining=...)，
+             * 整页几十个分包会让主循环卡住数秒。
+             * 新数据已由上面的 FX_DEVMON_UpdateMonitor_Data() 写入 g_data_rows，
+             * 浏览器每 5s 元刷新重新请求本页时会用这份数据渲染，因此无需在此重发。 */
             break;
         default:
             HTTPS_DEBUG("current_page =%d \r\n",current_page);
