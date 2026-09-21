@@ -129,16 +129,16 @@ static char* FX_PLCINF_GenerateErrorTable(void)
     
     /* 表格头部 */
     MITSU_HTTP_Emit(
-           "<table border=\"1\" cellspacing=\"1\">\r\n"
+           "<table border=\"1\" cellspacing=\"1\" style=\"margin:0 auto;\">\r\n"
            "<tbody>\r\n"
            "<tr>\r\n"
            "<td>\r\n"
-           "<table border=\"1\" cellspacing=\"0\" bgcolor=\"#ffffff\" style=\"text-align:center;font-size:14px\">\r\n"
+           "<table border=\"1\" cellspacing=\"0\" bgcolor=\"#ffffff\" style=\"table-layout:fixed;text-align:center;font-size:14px\">\r\n"
            "<tbody>\r\n"
            "<tr bgcolor=\"#cccccc\">\r\n"
-           "<td width=\"50\">No.</td>\r\n"
-           "<td width=\"120\">错误步</td>\r\n"
-           "<td width=\"300\">当前错误</td>\r\n"
+           "<td width=\"90\">No.</td>\r\n"
+           "<td width=\"180\">错误步</td>\r\n"
+           "<td width=\"630\">当前错误</td>\r\n"
            "</tr>\r\n");
     
     /* 生成错误行 */
@@ -270,11 +270,11 @@ void FX_PLCINF_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,char *url)
     offset += sprintf(temp_buffer + offset, "<div class=\"content\">\r\n");
     offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_REFRESH));
     offset += sprintf(temp_buffer + offset, "<form action=\"fx_plcinf.html\" method=\"post\">\r\n");
-    offset += sprintf(temp_buffer + offset, "<font style=\"font-size=16px\"><b>PLC信息</b></font>\r\n");
+    offset += sprintf(temp_buffer + offset, "<div style=\"text-align:center\"><font style=\"font-size=16px\"><b>PLC信息</b></font></div>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
     /* 第五次打包: PLC信息表格开始和标题行 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" style=\"table-layout:fixed; font-size:14px;\">\r\n");
+    offset += sprintf(temp_buffer + offset, "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" style=\"table-layout:fixed; font-size:14px; margin:0 auto;\">\r\n");
     offset += sprintf(temp_buffer + offset, "<tbody>\r\n");
     offset += sprintf(temp_buffer + offset, "<tr><td width=\"20\"></td><td width=\"50\"></td><td width=\"10\"></td><td width=\"50\"></td><td width=\"10\"></td><td width=\"90\"></td><td width=\"200\"></td><td width=\"170\"></td><td width=\"80\"></td><td width=\"80\"></td></tr>\r\n");
     offset += sprintf(temp_buffer + offset, "<tr><td colspan=\"7\">PLC信息</td><td colspan=\"1\" align=\"right\">状态 :&nbsp;</td><td colspan=\"2\">%s</td></tr>\r\n", monitor_status);
@@ -313,7 +313,7 @@ void FX_PLCINF_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,char *url)
 
     /* 第十一次打包: 错误信息表格标题 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" bgcolor=\"#ffffff\">\r\n");
+    offset += sprintf(temp_buffer + offset, "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" bgcolor=\"#ffffff\" style=\"margin:0 auto;\">\r\n");
     offset += sprintf(temp_buffer + offset, "<tbody><tr><td bgcolor=\"#cccccc\">错误信息</td></tr></tbody>\r\n");
     offset += sprintf(temp_buffer + offset, "</table>\r\n");
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);

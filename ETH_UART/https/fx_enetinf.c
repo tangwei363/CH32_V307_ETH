@@ -19,6 +19,16 @@
 #include "bsp_uart.h"
 /* 全局变量定义 */
 static fx_enetinf_adapter_t g_adapter_info;
+
+/* LED 状态 -> 原厂 CSS 类名（绿=ledg / 亮=ledr / 灭=off，类定义见共享 CSS）
+ * 说明: 原代码调用了一个全工程并不存在的 LED 类名函数(已随旧实现删除)，
+ *       这正是 LED 段被整块注释掉的原因。写法与 fx_plcinf.c 保持一致。 */
+static const char* FX_ENETINF_LEDClass(fx_enetinf_led_state_t st)
+{
+    if (st == FX_ENET_LED_GREEN) { return "ledg"; }
+    if (st == FX_ENET_LED_ON)    { return "ledr"; }
+    return "off";
+}
  
 fx_enetinf_error_log_t g_error_logs[FX_ENETINF_MAX_ERRORS];
 fifo_queue_t g_error_fifo = {0};
@@ -466,15 +476,25 @@ void FX_ENETINF_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,char *url)
     offset = 0;
     offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"10\">以太网适配器设置</td>\r\n</tr>\r\n<tr>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"5\">IP地址</td>\r\n<td colspan=\"1\" class=\"inf\" align=\"right\">%d.%d.%d.%d</td>\r\n<td colspan=\"3\"></td>\r\n</tr>\r\n", Basic_CfgBuf.ip[0], Basic_CfgBuf.ip[1], Basic_CfgBuf.ip[2], Basic_CfgBuf.ip[3]);
     offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"5\">子网掩码类型</td>\r\n<td colspan=\"1\" class=\"inf\" align=\"right\">%d.%d.%d.%d</td>\r\n<td colspan=\"3\"></td>\r\n</tr>\r\n", Basic_CfgBuf.mask[0], Basic_CfgBuf.mask[1], Basic_CfgBuf.mask[2], Basic_CfgBuf.mask[3]);
+    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"5\">默认路由器IP地址</td>\r\n<td colspan=\"1\" class=\"inf\" align=\"right\">%d.%d.%d.%d</td>\r\n<td colspan=\"3\"></td>\r\n</tr>\r\n", Basic_CfgBuf.gateway[0], Basic_CfgBuf.gateway[1], Basic_CfgBuf.gateway[2], Basic_CfgBuf.gateway[3]);
+    /* 以太网适配器设置段必须在这里发出去：原代码只拼装、不发送，
+     * 内容随即被下一个分包(offset=0)覆盖 → 页面缺整段"以太网适配器设置"。 */
+    Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 
-    // /* 第八次打包: LED状态行 */
-    // offset = 0;
-    // offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" align=\"right\">POWER</td>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" class=\"%s\">&nbsp;</td>\r\n<td colspan=\"6\"></td>\r\n</tr>\r\n", HTML_GetLEDClass_Old(g_adapter_info.led_power == FX_ENET_LED_GREEN ? 1 : 0));
-    // offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" align=\"right\">100M</td>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" class=\"%s\">&nbsp;</td>\r\n<td colspan=\"6\"></td>\r\n</tr>\r\n", HTML_GetLEDClass_Old(g_adapter_info.led_100m == FX_ENET_LED_GREEN ? 1 : 0));
-    // offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" align=\"right\">ERR.</td>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" class=\"%s\">&nbsp;</td>\r\n<td colspan=\"6\"></td>\r\n</tr>\r\n", HTML_GetLEDClass_Old(g_adapter_info.led_err == FX_ENET_LED_ON ? 1 : 0));
-    // offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" align=\"right\">OPEN</td>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" class=\"%s\">&nbsp;</td>\r\n<td colspan=\"6\"></td>\r\n</tr>\r\n", HTML_GetLEDClass_Old(g_adapter_info.led_open == FX_ENET_LED_GREEN ? 1 : 0));
-    // offset += sprintf(temp_buffer + offset, "</tbody>\r\n</table>\r\n<input type=\"hidden\" name=\"LANG\" value=\"ZS\">\r\n</form>\r\n");
-    // Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
+
+    /* 第八次打包(恢复): LED 状态标题 + POWER/100M/ERR./OPEN 四行
+     * 原代码从 LED 行到 Data_Send 全被注释，导致 LED 段与表格/表单收尾
+     * 都未发出；这里改成本文件内可用的 FX_ENETINF_LEDClass()，
+     * 且 LED 段单独成包，不与上面的设置行挤在同一缓冲。 */
+    offset = 0;
+    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"10\">&nbsp;</td>\r\n</tr>\r\n");
+    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"10\">LED 状态</td>\r\n</tr>\r\n");
+    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" align=\"right\">POWER</td>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" class=\"%s\">&nbsp;</td>\r\n<td colspan=\"6\"></td>\r\n</tr>\r\n", FX_ENETINF_LEDClass(g_adapter_info.led_power));
+    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" align=\"right\">100M</td>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" class=\"%s\">&nbsp;</td>\r\n<td colspan=\"6\"></td>\r\n</tr>\r\n", FX_ENETINF_LEDClass(g_adapter_info.led_100m));
+    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" align=\"right\">ERR.</td>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" class=\"%s\">&nbsp;</td>\r\n<td colspan=\"6\"></td>\r\n</tr>\r\n", FX_ENETINF_LEDClass(g_adapter_info.led_err));
+    offset += sprintf(temp_buffer + offset, "<tr>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" align=\"right\">OPEN</td>\r\n<td colspan=\"1\"></td>\r\n<td colspan=\"1\" class=\"%s\">&nbsp;</td>\r\n<td colspan=\"6\"></td>\r\n</tr>\r\n", FX_ENETINF_LEDClass(g_adapter_info.led_open));
+    offset += sprintf(temp_buffer + offset, "</tbody>\r\n</table>\r\n<input type=\"hidden\" name=\"LANG\" value=\"ZS\">\r\n</form>\r\n");
+    Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
 
     /* 第九次打包: 错误履历表格标题 */
     offset = 0;

@@ -9,6 +9,7 @@
 *******************************************************************************/
 
 #include "html_components.h"
+#include "HTTPS.h"      /* 取 HTML_LEN：用于下面分包缓冲容量的编译期校验 */
 #include <string.h>
 #include <stdio.h>
 
@@ -32,7 +33,7 @@ static const char HTML_Component_Refresh[] =
 /* 新版CSS样式 (index.c使用) - 仅保留居中和自适应功能 */
 static const char HTML_Component_CSS_New[] =
     "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\r\n"
-    "<style>*{margin:0;padding:0;box-sizing:border-box}body{padding:10px;font-family:Arial,sans-serif}.c{max-width:1200px;margin:0 auto}.l{padding:8px 15px;margin-bottom:10px;text-align:right}.l a{text-decoration:none;padding:5px 10px;margin:0 2px}.l a:hover{font-weight:bold}.n{padding:10px;margin-bottom:15px;text-align:center}.n a{text-decoration:none;padding:6px 12px;margin:3px;display:inline-block}.n a:hover{font-weight:bold}.x{padding:30px 20px;text-align:center;margin-bottom:10px}.c1{font-size:20px;font-style:italic;margin:15px 0}.p{font-size:32px;font-style:italic;margin:20px 0}.t{font-size:22px;font-style:italic;margin:25px 0}.f{font-size:11px;text-align:center;padding:15px 0;border-top:1px solid}.inf{background-color:#ffffff;border-style:inset;border-width:2px}.ledr{background-color:#ff0000;border-style:solid;border-color:#000000;border-width:2px}.ledg{background-color:#00ff00;border-style:solid;border-color:#000000;border-width:2px}.off{background-color:#ffffff;border-style:solid;border-color:#000000;border-width:2px}</style></head>\r\n";
+    "<style>*{margin:0;padding:0;box-sizing:border-box}body{padding:10px;font-family:Arial,sans-serif;text-align:center}.c{max-width:1200px;margin:0 auto}.l{padding:8px 15px;margin-bottom:10px;text-align:right}.l a{text-decoration:none;padding:5px 10px;margin:0 2px}.l a:hover{font-weight:bold}.n{padding:10px;margin-bottom:15px;text-align:center}.n a{text-decoration:none;padding:6px 12px;margin:3px;display:inline-block}.n a:hover{font-weight:bold}.x{padding:30px 20px;text-align:center;margin-bottom:10px}.c1{font-size:20px;font-style:italic;margin:15px 0}.p{font-size:32px;font-style:italic;margin:20px 0}.t{font-size:22px;font-style:italic;margin:25px 0}.f{font-size:11px;text-align:center;padding:15px 0;border-top:1px solid}.inf{background-color:#ffffff;border-style:inset;border-width:2px}.ledr{background-color:#ff0000;border-style:solid;border-color:#000000;border-width:2px}.ledg{background-color:#00ff00;border-style:solid;border-color:#000000;border-width:2px}.off{background-color:#ffffff;border-style:solid;border-color:#000000;border-width:2px}.ct{background-color:#cccccc}table{margin-left:auto;margin-right:auto;text-align:left}</style></head>\r\n";
 
 /* 响应式CSS样式 (fx_acclog.c等使用) - 完整的响应式设计 */
 static const char HTML_Component_CSS_Responsive[] =
@@ -48,7 +49,18 @@ static const char HTML_Component_Body_Start_New[] =
 
 /* 新版导航栏 (index.c) */
 static const char HTML_Component_Nav_Bar_New[] =
-    "<table rules=\"all\" cellspacing=\"0\" cellpadding=\"0\" style=\"table-layout:fixed; font-size:12px\"><tbody><tr><td align=\"center\" width=\"60\"><a href=\"index.html?LANG=ZS\">主页</a></td><td align=\"center\" width=\"220\"><a href=\"fx_devmon.html?LANG=ZS\">软元件/缓冲存储器批量监视</a></td><td align=\"center\" width=\"110\"><a href=\"fx_plcinf.html?CMD=%BC%E0%CA%D3%BF%AA%CA%BC&amp;LANG=ZS\">PLC信息</a></td><td align=\"center\" width=\"180\"><a href=\"fx_enetinf.html?CMD=%BC%E0%CA%D3%BF%AA%CA%BC&amp;LANG=ZS\">FX3U-ENET-ADP信息</a></td><td align=\"center\" width=\"140\"><a href=\"fx_status.html?CMD=%BC%E0%CA%D3%BF%AA%CA%BC&amp;LANG=ZS\">通信状态</a></td><td align=\"center\" width=\"90\"><a href=\"fx_acclog.html?CMD=%BC%E0%CA%D3%BF%AA%CA%BC&amp;LANG=ZS\">访问履历</a></td></tr></tbody></table>\r\n";
+    "<table rules=\"all\" cellspacing=\"0\" cellpadding=\"0\" style=\"table-layout:fixed; font-size:12px; margin:0 auto;\"><tbody><tr><td align=\"center\" width=\"60\"><a href=\"index.html?LANG=ZS\">主页</a></td><td align=\"center\" width=\"220\"><a href=\"fx_devmon.html?LANG=ZS\">软元件/缓冲存储器批量监视</a></td><td align=\"center\" width=\"110\"><a href=\"fx_plcinf.html?CMD=%BC%E0%CA%D3%BF%AA%CA%BC&amp;LANG=ZS\">PLC信息</a></td><td align=\"center\" width=\"180\"><a href=\"fx_enetinf.html?CMD=%BC%E0%CA%D3%BF%AA%CA%BC&amp;LANG=ZS\">FX3U-ENET-ADP信息</a></td><td align=\"center\" width=\"140\"><a href=\"fx_status.html?CMD=%BC%E0%CA%D3%BF%AA%CA%BC&amp;LANG=ZS\">通信状态</a></td><td align=\"center\" width=\"90\"><a href=\"fx_acclog.html?CMD=%BC%E0%CA%D3%BF%AA%CA%BC&amp;LANG=ZS\">访问履历</a></td></tr></tbody></table>\r\n";
+
+/* ── 编译期防呆：分包缓冲容量校验（越界会写穿 BSS 导致死机）────────────
+ * 各页面第一个分包是「HTML头部 + CSS」，第二个是「body开始 + 导航栏」，
+ * 它们都 sprintf 进 HtmlBuffer[HTML_LEN]。一旦组件总长超过 HTML_LEN，
+ * 就会越界覆盖紧随其后的 http_request / g_data_rows / g_monitor_config，
+ * 表现为页面能显示但随即死机（历史故障根因）。
+ * 下面两条断言把该校验提前到编译期：组件或缓冲长度失衡会直接编译失败。 */
+typedef char HTML_Assert_HeaderCss_Fits_HtmlBuffer[
+    ((sizeof(HTML_Component_Header) + sizeof(HTML_Component_CSS_New) + 32u) <= (unsigned)HTML_LEN) ? 1 : -1];
+typedef char HTML_Assert_BodyNav_Fits_HtmlBuffer[
+    ((sizeof(HTML_Component_Body_Start_New) + sizeof(HTML_Component_Nav_Bar_New) + 8u) <= (unsigned)HTML_LEN) ? 1 : -1];
 
 /* 响应式导航栏 (fx_acclog.c等使用) */
 static const char HTML_Component_Nav_Bar_Responsive[] =
