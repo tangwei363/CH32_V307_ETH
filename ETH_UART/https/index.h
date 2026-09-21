@@ -3,7 +3,7 @@
  * Author             : AI Assistant
  * Version            : V2.0.0
  * Date               : 2026/03/16
- * Description        : ä¸‰è±FX3U-ENET-ADP HTTPæœåŠ¡å™¨å¤´æ–‡ä»¶ - å¤ç”¨HTTPS.cç°æœ‰å‡½æ•°
+ * Description        : ÈıÁâFX3U-ENET-ADP HTTP·şÎñÆ÷Í·ÎÄ¼ş - ¸´ÓÃHTTPS.cÏÖÓĞº¯Êı
 *********************************************************************************
 * Copyright (c) 2026 AI Assistant. All rights reserved.
 *******************************************************************************/
@@ -21,87 +21,87 @@
 #include "fx_acclog.h"
 #include "fx_devmon.h"
 #include "ethernet_app.h"
-/* HTTPæœåŠ¡å™¨ç«¯å£å· */
+/* HTTP·şÎñÆ÷¶Ë¿ÚºÅ */
 #define MITSUBISHI_HTTP_PORT      80
 
-/* ç½‘é¡µç¼“å†²åŒºå¤§å° - ç›´æ¥ä½¿ç”¨HTTPS.cä¸­çš„HtmlBuffer */
+/* ÍøÒ³»º³åÇø´óĞ¡ - Ö±½ÓÊ¹ÓÃHTTPS.cÖĞµÄHtmlBuffer */
  
 /*
- * è¡¨æ ¼ç´¯ç§¯ç¼“å†²åŒºå¤§å°ã€‚
- * æ”¹ä¸º"è¾¹ç”Ÿæˆè¾¹å‘é€"åï¼Œè¯¥ç¼“å†²åªä½œä¸ºå‘é€å‰çš„æš‚å­˜åŒºï¼Œæ— éœ€å®¹çº³æ•´å¼ è¡¨æ ¼ã€‚
- * MITSU_HTTP_Emit å¯¹è¶…é•¿å•æ®µä¼šè‡ªåŠ¨ç›´å‘ï¼Œå› æ­¤è¯¥å€¼ä»…å½±å“å‘é€ç²’åº¦ã€ä¸ä¼šè¶Šç•Œã€‚
- * å– 512 å­—èŠ‚ï¼šä¸ SX_CHUNK_MAX(900) é…åˆï¼Œå…¼é¡¾ SRAM ä¸å‘é€æ•ˆç‡ã€‚
+ * ±í¸ñÀÛ»ı»º³åÇø´óĞ¡¡£
+ * ¸ÄÎª"±ßÉú³É±ß·¢ËÍ"ºó£¬¸Ã»º³åÖ»×÷Îª·¢ËÍÇ°µÄÔİ´æÇø£¬ÎŞĞèÈİÄÉÕûÕÅ±í¸ñ¡£
+ * MITSU_HTTP_Emit ¶Ô³¬³¤µ¥¶Î»á×Ô¶¯Ö±·¢£¬Òò´Ë¸ÃÖµ½öÓ°Ïì·¢ËÍÁ£¶È¡¢²»»áÔ½½ç¡£
+ * È¡ 512 ×Ö½Ú£ºÓë SX_CHUNK_MAX(900) ÅäºÏ£¬¼æ¹Ë SRAM Óë·¢ËÍĞ§ÂÊ¡£
  */
 #define MITSU_TABLE_BUFFER_SIZE   512
 
-/* å¤–éƒ¨å˜é‡å£°æ˜ - ä½¿ç”¨HTTPS.cä¸­çš„ç»“æ„ä½“ */
+/* Íâ²¿±äÁ¿ÉùÃ÷ - Ê¹ÓÃHTTPS.cÖĞµÄ½á¹¹Ìå */
 extern st_http_request http_request;
 
 extern char mitsu_table_buffer[MITSU_TABLE_BUFFER_SIZE];
  
-/* è¡¨æ ¼ç¼“å†²åŒºç®¡ç†å‡½æ•° - æ‰€æœ‰é¡µé¢å…±ç”¨ */
+/* ±í¸ñ»º³åÇø¹ÜÀíº¯Êı - ËùÓĞÒ³Ãæ¹²ÓÃ */
 char* MITSU_HTTP_GetTableBuffer(void);
 void MITSU_HTTP_ClearTableBuffer(void);
 
 /*
- * è¡¨æ ¼æµå¼å‘é€æ¥å£
- *   1) MITSU_HTTP_BeginTable(sock) ç»‘å®šæœ¬æ¬¡è¡¨æ ¼çš„ç›®æ ‡ socketï¼›
- *   2) ç”¨ MITSU_HTTP_Emit() é€æ®µè¿½åŠ  HTMLï¼ˆç´¯ç§¯åˆ°é˜ˆå€¼å³è‡ªåŠ¨å‘å‡ºï¼‰ï¼›
- *   3) MITSU_HTTP_FlushTable() å†²åˆ·å°¾éƒ¨æ®‹ç•™ã€‚
- * å¦‚æ­¤å¯æ”¯æŒä»»æ„é•¿åº¦è¡¨æ ¼ï¼Œä¸”ä¸ HTTP chunked åˆ†åŒ…å¤©ç„¶é…åˆã€‚
+ * ±í¸ñÁ÷Ê½·¢ËÍ½Ó¿Ú
+ *   1) MITSU_HTTP_BeginTable(sock) °ó¶¨±¾´Î±í¸ñµÄÄ¿±ê socket£»
+ *   2) ÓÃ MITSU_HTTP_Emit() Öğ¶Î×·¼Ó HTML£¨ÀÛ»ıµ½ãĞÖµ¼´×Ô¶¯·¢³ö£©£»
+ *   3) MITSU_HTTP_FlushTable() ³åË¢Î²²¿²ĞÁô¡£
+ * Èç´Ë¿ÉÖ§³ÖÈÎÒâ³¤¶È±í¸ñ£¬ÇÒÓë HTTP chunked ·Ö°üÌìÈ»ÅäºÏ¡£
  */
 void MITSU_HTTP_BeginTable(uint8_t sock);
 void MITSU_HTTP_Emit(const char *src);
 void MITSU_HTTP_FlushTable(void);
 
-/* ä¸»é¡µHTMLå†…å®¹ - å¤–éƒ¨å£°æ˜ */
+/* Ö÷Ò³HTMLÄÚÈİ - Íâ²¿ÉùÃ÷ */
 extern const char Html_Index[];
 
-/* å‡½æ•°å£°æ˜ */
+/* º¯ÊıÉùÃ÷ */
 
 /**
- * @brief  åˆå§‹åŒ–ä¸‰è±HTTPæœåŠ¡å™¨
- * @param  æ— 
- * @retval æ— 
- * @note   åˆå§‹åŒ–HTTPè¯·æ±‚ç»“æ„ä½“å’Œç¼“å†²åŒº
+ * @brief  ³õÊ¼»¯ÈıÁâHTTP·şÎñÆ÷
+ * @param  ÎŞ
+ * @retval ÎŞ
+ * @note   ³õÊ¼»¯HTTPÇëÇó½á¹¹ÌåºÍ»º³åÇø
  */
 void MITSU_HTTP_Init(void);
 
  
 /**
- * @brief  è§£æHTTPè¯·æ±‚
- * @param  request: HTTPè¯·æ±‚ç»“æ„ä½“æŒ‡é’ˆ(st_http_requestç±»å‹,æ¥è‡ªHTTPS.h)
- * @param  buffer: HTTPæ•°æ®ç¼“å†²åŒº
- * @retval æ— 
- * @note   å†…éƒ¨è°ƒç”¨HTTPS.cçš„ParseHttpRequestå‡½æ•°
+ * @brief  ½âÎöHTTPÇëÇó
+ * @param  request: HTTPÇëÇó½á¹¹ÌåÖ¸Õë(st_http_requestÀàĞÍ,À´×ÔHTTPS.h)
+ * @param  buffer: HTTPÊı¾İ»º³åÇø
+ * @retval ÎŞ
+ * @note   ÄÚ²¿µ÷ÓÃHTTPS.cµÄParseHttpRequestº¯Êı
  */
 void MITSU_HTTP_ParseRequest(st_http_request *request, char *buffer);
 
 /**
- * @brief  è§£æURLç±»å‹
- * @param  type: ç±»å‹æŒ‡é’ˆ(æ¥è‡ªHTTPS.h: PTYPE_HTML/PTYPE_PNGç­‰)
- * @param  url: URLå­—ç¬¦ä¸²
- * @retval æ— 
- * @note   å†…éƒ¨è°ƒç”¨HTTPS.cçš„ParseURLTypeå‡½æ•°
+ * @brief  ½âÎöURLÀàĞÍ
+ * @param  type: ÀàĞÍÖ¸Õë(À´×ÔHTTPS.h: PTYPE_HTML/PTYPE_PNGµÈ)
+ * @param  url: URL×Ö·û´®
+ * @retval ÎŞ
+ * @note   ÄÚ²¿µ÷ÓÃHTTPS.cµÄParseURLTypeº¯Êı
  */
 void MITSU_HTTP_ParseURLType(char *type, char *url);
 
 /**
- * @brief  ç”ŸæˆHTTPå“åº”å¤´
- * @param  buffer: å“åº”ç¼“å†²åŒº
- * @param  type: èµ„æºç±»å‹(æ¥è‡ªHTTPS.h: PTYPE_HTML/PTYPE_PNGç­‰)
- * @param  content_len: å†…å®¹é•¿åº¦
- * @retval å“åº”å¤´é•¿åº¦
- * @note   å†…éƒ¨è°ƒç”¨HTTPS.cçš„MakeHttpResponseå‡½æ•°
+ * @brief  Éú³ÉHTTPÏìÓ¦Í·
+ * @param  buffer: ÏìÓ¦»º³åÇø
+ * @param  type: ×ÊÔ´ÀàĞÍ(À´×ÔHTTPS.h: PTYPE_HTML/PTYPE_PNGµÈ)
+ * @param  content_len: ÄÚÈİ³¤¶È
+ * @retval ÏìÓ¦Í·³¤¶È
+ * @note   ÄÚ²¿µ÷ÓÃHTTPS.cµÄMakeHttpResponseº¯Êı
  */
 uint32_t MITSU_HTTP_MakeResponseHeader(char *buffer, char type, uint32_t content_len);
 
 /**
- * @brief  æµå¼å‘é€ä¸»é¡µHTMLå†…å®¹
+ * @brief  Á÷Ê½·¢ËÍÖ÷Ò³HTMLÄÚÈİ
  * @param  Dest_Sock: Socket ID
- * @param  url: URLå­—ç¬¦ä¸²
- * @retval æ— 
- * @note   æµå¼å‘é€ä¸‰è±FX3U-ENET-ADPä¸»é¡µHTMLå†…å®¹,é¿å…åœ¨RAMä¸­å­˜å‚¨å®Œæ•´é¡µé¢
+ * @param  url: URL×Ö·û´®
+ * @retval ÎŞ
+ * @note   Á÷Ê½·¢ËÍÈıÁâFX3U-ENET-ADPÖ÷Ò³HTMLÄÚÈİ,±ÜÃâÔÚRAMÖĞ´æ´¢ÍêÕûÒ³Ãæ
  */
 void FX_index_SendWebPage(uint8_t Dest_Sock, char *url);
 

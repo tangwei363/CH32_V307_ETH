@@ -3,7 +3,7 @@
  * Author             : AI Assistant
  * Version            : V1.0.0
  * Date               : 2026/03/20
- * Description        : HTML共享组件头文件 - 用于减少ARM单片机内存占用
+ * Description        : HTML�������ͷ�ļ� - ���ڼ���ARM��Ƭ���ڴ�ռ��
  *********************************************************************************
 * Copyright (c) 2026 AI Assistant. All rights reserved.
 *******************************************************************************/
@@ -18,7 +18,7 @@
 #include "melsec_fx_tables.h"
 
  
-/* 页面类型枚举 */
+/* ҳ������ö�� */
 typedef enum {
     HTML_PAGE_INDEX = 0,
     HTML_PAGE_DEVMON = 1,
@@ -29,34 +29,34 @@ typedef enum {
     HTML_PAGE_COUNT
 } html_page_type_t;
 
-/* HTML组件类型 */
+/* HTML������� */
 typedef enum {
-    HTML_COMP_HEADER = 0,           /* HTML头部 - DOCTYPE到<head> */
-    HTML_COMP_CSS_NEW ,             /* 新版CSS样式 (index.c) */
-    HTML_COMP_CSS_RESPONSIVE ,      /* 响应式CSS样式 (fx_acclog.c等) */
-    HTML_COMP_BODY_START_NEW ,      /* <body>开始 (新版) */
-    HTML_COMP_LANG_BAR_NEW ,        /* 新版语言选择栏 */
-    HTML_COMP_LANG_BAR_RESPONSIVE ,  /* 响应式语言选择栏 */
-    HTML_COMP_NAV_BAR_NEW ,         /* 新版导航栏 */
-    HTML_COMP_NAV_BAR_RESPONSIVE ,  /* 响应式导航栏 */
-    HTML_COMP_FORM_START ,          /* 表单开始 */
-    HTML_COMP_FOOTER_NEW ,          /* 新版页脚 */
-    HTML_COMP_BODY_END ,            /* HTML结束标签 */
-    HTML_COMP_REFRESH ,             /* 自动刷新标签 (用于需要自动刷新的页面) */
+    HTML_COMP_HEADER = 0,           /* HTMLͷ�� - DOCTYPE��<head> */
+    HTML_COMP_CSS_NEW ,             /* �°�CSS��ʽ (index.c) */
+    HTML_COMP_CSS_RESPONSIVE ,      /* ��ӦʽCSS��ʽ (fx_acclog.c��) */
+    HTML_COMP_BODY_START_NEW ,      /* <body>��ʼ (�°�) */
+    HTML_COMP_LANG_BAR_NEW ,        /* �°�����ѡ���� */
+    HTML_COMP_LANG_BAR_RESPONSIVE ,  /* ��Ӧʽ����ѡ���� */
+    HTML_COMP_NAV_BAR_NEW ,         /* �°浼���� */
+    HTML_COMP_NAV_BAR_RESPONSIVE ,  /* ��Ӧʽ������ */
+    HTML_COMP_FORM_START ,          /* ������ʼ */
+    HTML_COMP_FOOTER_NEW ,          /* �°�ҳ�� */
+    HTML_COMP_BODY_END ,            /* HTML������ǩ */
+    HTML_COMP_REFRESH ,             /* �Զ�ˢ�±�ǩ (������Ҫ�Զ�ˢ�µ�ҳ��) */
     HTML_COMP_COUNT
 } html_component_type_t;
 
-/* 状态枚举 */
+/* ״̬ö�� */
 typedef enum {
     HTML_STATE_IDLE = 0,
     HTML_STATE_RUNNING = 1,
     HTML_STATE_STOPPED = 2
 } html_state_t;
 
-/* 获取组件内容 */
+/* ��ȡ������� */
 const char* HTML_GetComponent(html_component_type_t comp_type);
 
-/* 获取状态字符串 */
+/* ��ȡ״̬�ַ��� */
 const char* HTML_GetStateString(html_state_t state);
 
 

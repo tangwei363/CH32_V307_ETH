@@ -3,7 +3,7 @@
  * Author             : AI Assistant
  * Version            : V1.0.0
  * Date               : 2026/04/03
- * Description        : é€šç”¨FIFOé˜Ÿåˆ—å®ç°å¤´æ–‡ä»¶
+ * Description        : Í¨ÓÃFIFO¶ÓÁĞÊµÏÖÍ·ÎÄ¼ş
 *********************************************************************************
 * Copyright (c) 2026 AI Assistant. All rights reserved.
 *******************************************************************************/
@@ -18,72 +18,72 @@ extern "C" {
 #include <stdint.h>
 
 /**
- * @brief é€šç”¨FIFOé˜Ÿåˆ—ç»“æ„ä½“
- * @note ç”¨äºå­˜å‚¨å„ç§ç±»å‹çš„è®°å½•ï¼Œå¦‚é”™è¯¯æ—¥å¿—ã€è®¿é—®æ—¥å¿—ç­‰
+ * @brief Í¨ÓÃFIFO¶ÓÁĞ½á¹¹Ìå
+ * @note ÓÃÓÚ´æ´¢¸÷ÖÖÀàĞÍµÄ¼ÇÂ¼£¬Èç´íÎóÈÕÖ¾¡¢·ÃÎÊÈÕÖ¾µÈ
  */
 typedef struct {
-    void *records;        /* è®°å½•æ•°ç»„æŒ‡é’ˆ */
-    uint8_t item_size;    /* å•ä¸ªè®°å½•çš„å¤§å° */
-    uint8_t size;         /* é˜Ÿåˆ—å¤§å° */
-    uint8_t head;         /* é˜Ÿåˆ—å¤´éƒ¨ç´¢å¼•ï¼ˆæœ€æ–°è®°å½•ä½ç½®ï¼‰ */
-    uint8_t tail;         /* é˜Ÿåˆ—å°¾éƒ¨ç´¢å¼•ï¼ˆæœ€æ—§è®°å½•ä½ç½®ï¼‰ */
-    uint8_t count;        /* å½“å‰è®°å½•æ•°é‡ */
-    uint8_t read_pos;     /* è¯»å–ä½ç½®ç´¢å¼• */
+    void *records;        /* ¼ÇÂ¼Êı×éÖ¸Õë */
+    uint8_t item_size;    /* µ¥¸ö¼ÇÂ¼µÄ´óĞ¡ */
+    uint8_t size;         /* ¶ÓÁĞ´óĞ¡ */
+    uint8_t head;         /* ¶ÓÁĞÍ·²¿Ë÷Òı£¨×îĞÂ¼ÇÂ¼Î»ÖÃ£© */
+    uint8_t tail;         /* ¶ÓÁĞÎ²²¿Ë÷Òı£¨×î¾É¼ÇÂ¼Î»ÖÃ£© */
+    uint8_t count;        /* µ±Ç°¼ÇÂ¼ÊıÁ¿ */
+    uint8_t read_pos;     /* ¶ÁÈ¡Î»ÖÃË÷Òı */
 } fifo_queue_t;
 
-/* å‡½æ•°å£°æ˜ */
+/* º¯ÊıÉùÃ÷ */
 
 /**
- * @brief åˆå§‹åŒ–FIFOé˜Ÿåˆ—
- * @param queue - é˜Ÿåˆ—ç»“æ„ä½“æŒ‡é’ˆ
- * @param records - è®°å½•æ•°ç»„æŒ‡é’ˆ
- * @param item_size - å•ä¸ªè®°å½•çš„å¤§å°
- * @param size - é˜Ÿåˆ—å¤§å°
- * @return æ— 
+ * @brief ³õÊ¼»¯FIFO¶ÓÁĞ
+ * @param queue - ¶ÓÁĞ½á¹¹ÌåÖ¸Õë
+ * @param records - ¼ÇÂ¼Êı×éÖ¸Õë
+ * @param item_size - µ¥¸ö¼ÇÂ¼µÄ´óĞ¡
+ * @param size - ¶ÓÁĞ´óĞ¡
+ * @return ÎŞ
  */
 void FIFO_Init(fifo_queue_t *queue, void *records, uint8_t item_size, uint8_t size);
 
 /**
- * @brief å‘é˜Ÿåˆ—æ·»åŠ è®°å½•
- * @param queue - é˜Ÿåˆ—ç»“æ„ä½“æŒ‡é’ˆ
- * @param record - è®°å½•æŒ‡é’ˆ
- * @return æ— 
+ * @brief Ïò¶ÓÁĞÌí¼Ó¼ÇÂ¼
+ * @param queue - ¶ÓÁĞ½á¹¹ÌåÖ¸Õë
+ * @param record - ¼ÇÂ¼Ö¸Õë
+ * @return ÎŞ
  */
 void FIFO_AddRecord(fifo_queue_t *queue, void *record);
 
 /**
- * @brief æŒ‰é¡ºåºè·å–ä¸‹ä¸€æ¡è®°å½•ï¼ˆä»å¤´åˆ°å°¾ï¼‰
- * @param queue - é˜Ÿåˆ—ç»“æ„ä½“æŒ‡é’ˆ
- * @param record - è®°å½•æŒ‡é’ˆ
- * @return 1 - æˆåŠŸè·å–è®°å½•ï¼Œ0 - æ²¡æœ‰æ›´å¤šè®°å½•
+ * @brief °´Ë³Ğò»ñÈ¡ÏÂÒ»Ìõ¼ÇÂ¼£¨´ÓÍ·µ½Î²£©
+ * @param queue - ¶ÓÁĞ½á¹¹ÌåÖ¸Õë
+ * @param record - ¼ÇÂ¼Ö¸Õë
+ * @return 1 - ³É¹¦»ñÈ¡¼ÇÂ¼£¬0 - Ã»ÓĞ¸ü¶à¼ÇÂ¼
  */
 uint8_t FIFO_GetNextRecord(fifo_queue_t *queue, void *record);
 
 /**
- * @brief é‡ç½®è¯»å–ä½ç½®åˆ°æœ€æ–°è®°å½•
- * @param queue - é˜Ÿåˆ—ç»“æ„ä½“æŒ‡é’ˆ
- * @return æ— 
+ * @brief ÖØÖÃ¶ÁÈ¡Î»ÖÃµ½×îĞÂ¼ÇÂ¼
+ * @param queue - ¶ÓÁĞ½á¹¹ÌåÖ¸Õë
+ * @return ÎŞ
  */
 void FIFO_ResetReadPos(fifo_queue_t *queue);
 
 /**
- * @brief æ¸…ç©ºé˜Ÿåˆ—
- * @param queue - é˜Ÿåˆ—ç»“æ„ä½“æŒ‡é’ˆ
- * @return æ— 
+ * @brief Çå¿Õ¶ÓÁĞ
+ * @param queue - ¶ÓÁĞ½á¹¹ÌåÖ¸Õë
+ * @return ÎŞ
  */
 void FIFO_Clear(fifo_queue_t *queue);
 
 /**
- * @brief è·å–é˜Ÿåˆ—ä¸­çš„è®°å½•æ•°é‡
- * @param queue - é˜Ÿåˆ—ç»“æ„ä½“æŒ‡é’ˆ
- * @return è®°å½•æ•°é‡
+ * @brief »ñÈ¡¶ÓÁĞÖĞµÄ¼ÇÂ¼ÊıÁ¿
+ * @param queue - ¶ÓÁĞ½á¹¹ÌåÖ¸Õë
+ * @return ¼ÇÂ¼ÊıÁ¿
  */
 uint8_t FIFO_GetCount(fifo_queue_t *queue);
 
 /**
- * @brief è·å–é˜Ÿåˆ—å¤§å°
- * @param queue - é˜Ÿåˆ—ç»“æ„ä½“æŒ‡é’ˆ
- * @return é˜Ÿåˆ—å¤§å°
+ * @brief »ñÈ¡¶ÓÁĞ´óĞ¡
+ * @param queue - ¶ÓÁĞ½á¹¹ÌåÖ¸Õë
+ * @return ¶ÓÁĞ´óĞ¡
  */
 uint8_t FIFO_GetSize(fifo_queue_t *queue);
 

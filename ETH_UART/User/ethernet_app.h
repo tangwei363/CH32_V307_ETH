@@ -16,7 +16,7 @@
 #define SOCKET_DIRECT_EN             1    // 直连TCPS melsoft链接            0:不启用 1:启用
 #define SOCKET_DISCOVER_EN           1    // 局域网发现 TCPS 设备链接         0:不启用 1:启用
 #define SOCKET_SNTP_EN               0    // SNTP 时间同步   UDP             0:不启用 1:启用
-#define SOCKET_HTTP_EN               0    // HTTP 网页显示   TCP             0:不启用 1:启用
+#define SOCKET_HTTP_EN               1    // HTTP 网页显示   TCP             0:不启用 1:启用
 #define SOCKET_PHY_LINK_EN           0    // PHY link 状态同步               0:不启用 1:启用
 
 #define FRAME_HEADER                0x02     //\STX

@@ -3,7 +3,7 @@
  * Author             : AI Assistant
  * Version            : V1.0.0
  * Date               : 2026/09/13
- * Description        : HTTP 分包流式发送与校验模块实现
+ * Description        : HTTP �ְ���ʽ������У��ģ��ʵ��
  *******************************************************************************/
 
 #include <stdio.h>
@@ -12,26 +12,26 @@
 #include "HTTPS.h"
 #include "sx_stream.h"
 
-/* ============================ 模块内部状态 ============================ */
+/* ============================ ģ���ڲ�״̬ ============================ */
 
-/* 每个 socket 一份流状态（静态分配，无动态内存） */
+/* ÿ�� socket һ����״̬����̬���䣬�޶�̬�ڴ棩 */
 static sx_stream_t g_sx[WCHNET_MAX_SOCKET_NUM];
 
-/* 全局任务号：每开始一个新页面请求自增，用于识别过期数据 */
+/* ȫ������ţ�ÿ��ʼһ����ҳ����������������ʶ��������� */
 static u16 g_sx_tid = 0;
 
-/* 页面类型名，仅用于元信息注释（索引 = html_page_type_t） */
+/* ҳ����������������Ԫ��Ϣע�ͣ����� = html_page_type_t�� */
 static const char * const g_sx_page_name[] = {
     "index", "devmon", "plcinf", "enetinf", "status", "acclog"
 };
 
 #define SX_PAGE_NAME_CNT   ((int)(sizeof(g_sx_page_name) / sizeof(g_sx_page_name[0])))
 
-/* ============================ CRC 实现 ============================ */
+/* ============================ CRC ʵ�� ============================ */
 
 /*
- * CRC-16/CCITT-FALSE，多项式 0x1021，初值 0xFFFF，不反转输入输出。
- * 使用位运算而非查表，节省 512 字节 Flash 且 RAM 开销为 0。
+ * CRC-16/CCITT-FALSE������ʽ 0x1021����ֵ 0xFFFF������ת���������
+ * ʹ��λ������ǲ������ʡ 512 �ֽ� Flash �� RAM ����Ϊ 0��
  */
 u16 SX_CRC16(const u8 *p, u32 n)
 {
@@ -56,8 +56,8 @@ u16 SX_CRC16(const u8 *p, u32 n)
 }
 
 /*
- * CRC-32 (IEEE 802.3)，多项式 0xEDB88320（反射），初值/收尾由宏控制。
- * 累进调用：crc = SX_CRC32_Update(crc, buf, len); 最终 final = SX_CRC32_FINAL(crc)
+ * CRC-32 (IEEE 802.3)������ʽ 0xEDB88320�����䣩����ֵ/��β�ɺ���ơ�
+ * �۽����ã�crc = SX_CRC32_Update(crc, buf, len); ���� final = SX_CRC32_FINAL(crc)
  */
 u32 SX_CRC32_Update(u32 crc, const u8 *p, u32 n)
 {
@@ -70,26 +70,26 @@ u32 SX_CRC32_Update(u32 crc, const u8 *p, u32 n)
     while (n--) {
         crc ^= (u32)(*p++);
         for (i = 0; i < 8; i++) {
-            /* (0u - (crc & 1)) 生成 0x00000000 或 0xFFFFFFFF 掩码，避免分支 */
+            /* (0u - (crc & 1)) ���� 0x00000000 �� 0xFFFFFFFF ���룬�����֧ */
             crc = (crc >> 1) ^ (0xEDB88320u & (0u - (crc & 1u)));
         }
     }
     return crc;
 }
 
-/* ============================ 内部辅助 ============================ */
+/* ============================ �ڲ����� ============================ */
 
 /*
- * 发送一个 HTTP chunk，线格式为：
+ * ����һ�� HTTP chunk���߸�ʽΪ��
  *     <hex-length>\r\n<payload>\r\n
- * 说明：长度、CRLF 与负载分多次裸发送，避免额外占用栈上的拼接缓冲。
+ * ˵�������ȡ�CRLF �븺�طֶ���㷢�ͣ��������ռ��ջ�ϵ�ƴ�ӻ��塣
  */
 static void SX_SendChunk(u8 sock, const u8 *data, u32 len)
 {
     static const u8 CRLF[2] = { '\r', '\n' };
     char hexlen[8];
 
-    /* chunked 规范要求长度为十六进制字符串；长度最大 SX_CHUNK_MAX，32 位足够 */
+    /* chunked �淶Ҫ�󳤶�Ϊʮ�������ַ������������ SX_CHUNK_MAX��32 λ�㹻 */
     sprintf(hexlen, "%X", (unsigned int)len);
 
     SX_RawSend(sock, (const u8 *)hexlen, (u32)strlen(hexlen));
@@ -99,8 +99,8 @@ static void SX_SendChunk(u8 sock, const u8 *data, u32 len)
 }
 
 /*
- * 节流：每块之后给 TCP 栈留出搬运时间；
- * 每 SX_YIELD_EVERY 块额外让出一次 CPU，使 WCHNET 定时器得到调度。
+ * ������ÿ��֮��� TCP ջ��������ʱ�䣻
+ * ÿ SX_YIELD_EVERY ������ó�һ�� CPU��ʹ WCHNET ��ʱ���õ����ȡ�
  */
 static void SX_Throttle(sx_stream_t *s)
 {
@@ -116,7 +116,7 @@ static void SX_Throttle(sx_stream_t *s)
     }
 }
 
-/* ============================ 对外接口 ============================ */
+/* ============================ ����ӿ� ============================ */
 
 u8 SX_Active(u8 sock)
 {
@@ -150,16 +150,16 @@ void SX_Begin(u8 sock, char type, u8 page_id)
         return;
     }
 
-    /* 同一 socket 上若还有未结束的流，先中断，避免两块响应交错 */
+    /* ͬһ socket ��������δ�������������жϣ�����������Ӧ���� */
     if (g_sx[sock].active) {
         SX_Abort(sock);
     }
 
     /*
-     * 统一使用 chunked 传输编码：
-     *   - 无需预先知道页面总长度（页面是流式拼装的）
-     *   - 浏览器按 chunk 自行重组，末尾以 0\r\n\r\n 明确结束
-     *   - Cache-Control: no-store 避免浏览器缓存动态页面
+     * ͳһʹ�� chunked ������룺
+     *   - ����Ԥ��֪��ҳ���ܳ��ȣ�ҳ������ʽƴװ�ģ�
+     *   - ������� chunk �������飬ĩβ�� 0\r\n\r\n ��ȷ����
+     *   - Cache-Control: no-store ������������涯̬ҳ��
      */
     if (type == PTYPE_PNG) {
         head = "HTTP/1.1 200 OK\r\n"
@@ -180,7 +180,7 @@ void SX_Begin(u8 sock, char type, u8 page_id)
                "Cache-Control: no-store\r\n"
                "\r\n";
     } else {
-        /* 源文件中的中文字符串为 UTF-8，此处必须与之一致，否则中文乱码 */
+        /* Դ�ļ��е������ַ���Ϊ UTF-8���˴�������֮һ�£������������� */
         head = "HTTP/1.1 200 OK\r\n"
                "Content-Type: text/html; charset=UTF-8\r\n"
                "Transfer-Encoding: chunked\r\n"
@@ -188,7 +188,7 @@ void SX_Begin(u8 sock, char type, u8 page_id)
                "\r\n";
     }
 
-    /* HTTP 头本身不走 chunk 包装，直接裸发送 */
+    /* HTTP ͷ�������� chunk ��װ��ֱ���㷢�� */
     SX_RawSend(sock, (const u8 *)head, (u32)strlen(head));
 
     memset(&g_sx[sock], 0, sizeof(sx_stream_t));
@@ -212,17 +212,17 @@ void SX_Send(u8 sock, const u8 *data, u32 len)
 
     s = &g_sx[sock];
 
-    /* 未进入流模式（例如 SendHttpResponse 的 Content-Length 路径），退化为裸发送 */
+    /* δ������ģʽ������ SendHttpResponse �� Content-Length ·�������˻�Ϊ�㷢�� */
     if (!s->active) {
         SX_RawSend(sock, data, len);
         return;
     }
 
-    /* 累进整页 CRC-32：只统计真实负载，不含 chunk 包装字节 */
+    /* �۽���ҳ CRC-32��ֻͳ����ʵ���أ����� chunk ��װ�ֽ� */
     s->crc   = SX_CRC32_Update(s->crc, data, len);
     s->bytes += len;
 
-    /* 按 SX_CHUNK_MAX 切分为多个 chunk，逐块发送并节流 */
+    /* �� SX_CHUNK_MAX �з�Ϊ��� chunk����鷢�Ͳ����� */
     while (sent < len) {
         chunk = len - sent;
         if (chunk > SX_CHUNK_MAX) {
@@ -248,7 +248,7 @@ void SX_End(u8 sock, u8 page_id)
 
     s = &g_sx[sock];
 
-    /* 未处于流模式：本次响应走的是带 Content-Length 的路径，无需结束块 */
+    /* δ������ģʽ��������Ӧ�ߵ��Ǵ� Content-Length ��·������������� */
     if (!s->active) {
         return;
     }
@@ -265,12 +265,12 @@ void SX_End(u8 sock, u8 page_id)
         char meta[112];
 
         /*
-         * 元信息以 HTML 注释形式附在响应末尾（浏览器不渲染），内容为：
-         *   PAGE  页面名
-         *   TID   本次传输任务号，变化即代表新一次请求
-         *   CHUNKS 实际分块数
-         *   BYTES  负载总字节数
-         *   CRC32  整页 CRC-32，供抓包/AP 侧校验完整性
+         * Ԫ��Ϣ�� HTML ע����ʽ������Ӧĩβ�����������Ⱦ��������Ϊ��
+         *   PAGE  ҳ����
+         *   TID   ���δ�������ţ��仯��������һ������
+         *   CHUNKS ʵ�ʷֿ���
+         *   BYTES  �������ֽ���
+         *   CRC32  ��ҳ CRC-32����ץ��/AP ��У��������
          */
         sprintf(meta,
                 "<!--SX:PAGE=%s;TID=%u;CHUNKS=%u;BYTES=%u;CRC32=%08X-->\r\n",
@@ -285,7 +285,7 @@ void SX_End(u8 sock, u8 page_id)
     }
 #endif
 
-    /* chunked 结束块 */
+    /* chunked ������ */
     SX_RawSend(sock, (const u8 *)"0\r\n\r\n", 5);
 
     HTTPS_DEBUG("SX_End sock=%d page=%d chunks=%u bytes=%u crc=%08X\r\n",

@@ -17,7 +17,7 @@
 #include "wchnet.h"
 #include "bsp_flash.h"
 /* USER CODE END Private defines */
-//#define _HTTPS_DEBUG            //æ—¥å¿—æ¨¡å— å¼€å…³ï¼Œæ³¨é‡Šæ‰å°†å…³é—­æ—¥å¿—è¾“å‡º
+//#define _HTTPS_DEBUG            //ÈÕÖ¾Ä£¿é ¿ª¹Ø£¬×¢ÊÍµô½«¹Ø±ÕÈÕÖ¾Êä³ö
 
 #ifdef _HTTPS_DEBUG
     #define HTTPS_DEBUG(format, ...)  printf (format, ##__VA_ARGS__)
@@ -62,7 +62,7 @@
 
 #define RES_END "\r\n\r\n"
 
-#define HTML_LEN     768                         //Maximum size of a single web page(1024â†’768: å¤§é¡µé¢èµ°chunkedæµå¼, æ­¤å¤„ä»…ä½œç‰‡æ®µæš‚å­˜)
+#define HTML_LEN     768                         //Maximum size of a single web page(1024¡ú768: ´óÒ³Ãæ×ßchunkedÁ÷Ê½, ´Ë´¦½ö×÷Æ¬¶ÎÔİ´æ)
 
 typedef struct _st_http_request                 //Browser request information
 {
@@ -79,26 +79,26 @@ typedef struct Para_Tab                         //Configuration information para
 // <https.h>
 
 /*
- * é…ç½®å‚æ•°è¡¨å®ä¾‹ï¼Œå®šä¹‰åœ¨ bsp_flash.cï¼š
+ * ÅäÖÃ²ÎÊı±íÊµÀı£¬¶¨ÒåÔÚ bsp_flash.c£º
  *     Parameter Para_Basic[4], Para_Port[4], Para_Login[2];
- * åŸå…ˆç¼ºå°‘ extern å£°æ˜ï¼Œå¯¼è‡´ HTTPS.c çš„ Init_Para_Tab() ç¼–è¯‘æŠ¥
- * "'Para_Basic' undeclared"ï¼Œæ­¤å¤„è¡¥ä¸Šä½¿å®šä¹‰å¯¹ä½¿ç”¨è€…å¯è§ã€‚
+ * Ô­ÏÈÈ±ÉÙ extern ÉùÃ÷£¬µ¼ÖÂ HTTPS.c µÄ Init_Para_Tab() ±àÒë±¨
+ * "'Para_Basic' undeclared"£¬´Ë´¦²¹ÉÏÊ¹¶¨Òå¶ÔÊ¹ÓÃÕß¿É¼û¡£
  */
 extern Parameter Para_Basic[4];
 extern Parameter Para_Port[4];
 extern Parameter Para_Login[2];
 
-/* ç½‘é¡µçŠ¶æ€ç»“æ„ä½“ - ç”¨äºè®°å½•HTTPè¿æ¥å’Œé¡µé¢å¤„ç†çŠ¶æ€ */
+/* ÍøÒ³×´Ì¬½á¹¹Ìå - ÓÃÓÚ¼ÇÂ¼HTTPÁ¬½ÓºÍÒ³Ãæ´¦Àí×´Ì¬ */
 typedef struct _Web_Page_State
 {
-    u8  connected;                              // è¿æ¥çŠ¶æ€æ ‡å¿—: 0-æœªè¿æ¥, 1-å·²è¿æ¥
-    u8  current_page;                           // å½“å‰é¡µé¢ç±»å‹
-    u8  Sour_Sock;                              // å‘é€ç«¯å¥—æ¥å­—  
-    u8  Dest_Sock;                              // æ¥æ”¶ç«¯å¥—æ¥å­—  
-    u8  tx_busy;                                // å‘é€å¿™æ ‡å¿—: 0-ç©ºé—², 1-å¿™ç¢Œ
-    u8  rx_complete;                            // æ¥æ”¶å®Œæˆæ ‡å¿—: 0-æœªå®Œæˆ, 1-å·²å®Œæˆ
+    u8  connected;                              // Á¬½Ó×´Ì¬±êÖ¾: 0-Î´Á¬½Ó, 1-ÒÑÁ¬½Ó
+    u8  current_page;                           // µ±Ç°Ò³ÃæÀàĞÍ
+    u8  Sour_Sock;                              // ·¢ËÍ¶ËÌ×½Ó×Ö  
+    u8  Dest_Sock;                              // ½ÓÊÕ¶ËÌ×½Ó×Ö  
+    u8  tx_busy;                                // ·¢ËÍÃ¦±êÖ¾: 0-¿ÕÏĞ, 1-Ã¦Âµ
+    u8  rx_complete;                            // ½ÓÊÕÍê³É±êÖ¾: 0-Î´Íê³É, 1-ÒÑÍê³É
 
-    u32 timestamp;                              // æ—¶é—´æˆ³
+    u32 timestamp;                              // Ê±¼ä´Á
 } Web_Page_State_t;
 
 extern Web_Page_State_t Web_Page_State[4];
@@ -138,7 +138,7 @@ extern void Web_Usart_Handler(uint8_t Sour_Sock, uint8_t Dest_Sock, uint8_t *buf
 
 extern void Data_Send(u8 id, uint8_t *dataptr, uint32_t datalen);
 
-/* æµå¼HTTPå“åº”å‘é€æ¥å£ - ç”¨äºå¤§é¡µé¢åˆ†æ®µå‘é€ */
+/* Á÷Ê½HTTPÏìÓ¦·¢ËÍ½Ó¿Ú - ÓÃÓÚ´óÒ³Ãæ·Ö¶Î·¢ËÍ */
 extern void SendHttpHeader(u8 socket_id, char type);
 
 #endif

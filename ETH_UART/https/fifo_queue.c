@@ -3,7 +3,7 @@
  * Author             : AI Assistant
  * Version            : V1.0.0
  * Date               : 2026/04/03
- * Description        : é€šç”¨FIFOé˜Ÿåˆ—å®ç°æºæ–‡ä»¶
+ * Description        : Í¨ÓÃFIFO¶ÓÁĞÊµÏÖÔ´ÎÄ¼ş
 *********************************************************************************
 * Copyright (c) 2026 AI Assistant. All rights reserved.
 *******************************************************************************/
@@ -14,14 +14,14 @@
 /*********************************************************************
  * @fn      FIFO_Init
  *
- * @brief   åˆå§‹åŒ–FIFOé˜Ÿåˆ—
+ * @brief   ³õÊ¼»¯FIFO¶ÓÁĞ
  *
- * @param   queue - é˜Ÿåˆ—ç»“æ„ä½“æŒ‡é’ˆ
- *          records - è®°å½•æ•°ç»„æŒ‡é’ˆ
- *          item_size - å•ä¸ªè®°å½•çš„å¤§å°
- *          size - é˜Ÿåˆ—å¤§å°
+ * @param   queue - ¶ÓÁĞ½á¹¹ÌåÖ¸Õë
+ *          records - ¼ÇÂ¼Êı×éÖ¸Õë
+ *          item_size - µ¥¸ö¼ÇÂ¼µÄ´óĞ¡
+ *          size - ¶ÓÁĞ´óĞ¡
  *
- * @return  æ— 
+ * @return  ÎŞ
  */
 void FIFO_Init(fifo_queue_t *queue, void *records, uint8_t item_size, uint8_t size)
 {
@@ -37,7 +37,7 @@ void FIFO_Init(fifo_queue_t *queue, void *records, uint8_t item_size, uint8_t si
     queue->count = 0;
     queue->read_pos = 0;
     
-    /* åˆå§‹åŒ–è®°å½•æ•°ç»„ */
+    /* ³õÊ¼»¯¼ÇÂ¼Êı×é */
     if (records != NULL) {
         memset(records, 0, item_size * size);
     }
@@ -46,12 +46,12 @@ void FIFO_Init(fifo_queue_t *queue, void *records, uint8_t item_size, uint8_t si
 /*********************************************************************
  * @fn      FIFO_AddRecord
  *
- * @brief   å‘é˜Ÿåˆ—æ·»åŠ è®°å½•
+ * @brief   Ïò¶ÓÁĞÌí¼Ó¼ÇÂ¼
  *
- * @param   queue - é˜Ÿåˆ—ç»“æ„ä½“æŒ‡é’ˆ
- *          record - è®°å½•æŒ‡é’ˆ
+ * @param   queue - ¶ÓÁĞ½á¹¹ÌåÖ¸Õë
+ *          record - ¼ÇÂ¼Ö¸Õë
  *
- * @return  æ— 
+ * @return  ÎŞ
  */
 void FIFO_AddRecord(fifo_queue_t *queue, void *record)
 {
@@ -59,35 +59,35 @@ void FIFO_AddRecord(fifo_queue_t *queue, void *record)
         return;
     }
     
-    /* è®¡ç®—å½“å‰è®°å½•çš„åç§»é‡ */
+    /* ¼ÆËãµ±Ç°¼ÇÂ¼µÄÆ«ÒÆÁ¿ */
     uint16_t offset = (uint16_t)queue->head * queue->item_size;
     
-    /* æ·»åŠ æ–°è®°å½•åˆ°é˜Ÿåˆ—å¤´éƒ¨ */
+    /* Ìí¼ÓĞÂ¼ÇÂ¼µ½¶ÓÁĞÍ·²¿ */
     memcpy((uint8_t *)queue->records + offset, record, queue->item_size);
     
-    /* æ›´æ–°é˜Ÿåˆ—æŒ‡é’ˆ */
+    /* ¸üĞÂ¶ÓÁĞÖ¸Õë */
     queue->head = (queue->head + 1) % queue->size;
     
-    /* å¦‚æœé˜Ÿåˆ—å·²æ»¡ï¼Œæ›´æ–°å°¾éƒ¨æŒ‡é’ˆï¼ˆæ›¿æ¢æœ€æ—§çš„è®°å½•ï¼‰ */
+    /* Èç¹û¶ÓÁĞÒÑÂú£¬¸üĞÂÎ²²¿Ö¸Õë£¨Ìæ»»×î¾ÉµÄ¼ÇÂ¼£© */
     if (queue->count >= queue->size) {
         queue->tail = (queue->tail + 1) % queue->size;
     } else {
         queue->count++;
     }
     
-    /* é‡ç½®è¯»å–ä½ç½®åˆ°æœ€æ–°è®°å½• */
+    /* ÖØÖÃ¶ÁÈ¡Î»ÖÃµ½×îĞÂ¼ÇÂ¼ */
     queue->read_pos = (queue->head - 1 + queue->size) % queue->size;
 }
 
 /*********************************************************************
  * @fn      FIFO_GetNextRecord
  *
- * @brief   æŒ‰é¡ºåºè·å–ä¸‹ä¸€æ¡è®°å½•ï¼ˆä»å¤´åˆ°å°¾ï¼‰
+ * @brief   °´Ë³Ğò»ñÈ¡ÏÂÒ»Ìõ¼ÇÂ¼£¨´ÓÍ·µ½Î²£©
  *
- * @param   queue - é˜Ÿåˆ—ç»“æ„ä½“æŒ‡é’ˆ
- *          record - è®°å½•æŒ‡é’ˆ
+ * @param   queue - ¶ÓÁĞ½á¹¹ÌåÖ¸Õë
+ *          record - ¼ÇÂ¼Ö¸Õë
  *
- * @return  1 - æˆåŠŸè·å–è®°å½•ï¼Œ0 - æ²¡æœ‰æ›´å¤šè®°å½•
+ * @return  1 - ³É¹¦»ñÈ¡¼ÇÂ¼£¬0 - Ã»ÓĞ¸ü¶à¼ÇÂ¼
  */
 uint8_t FIFO_GetNextRecord(fifo_queue_t *queue, void *record)
 {
@@ -95,15 +95,15 @@ uint8_t FIFO_GetNextRecord(fifo_queue_t *queue, void *record)
         return 0;
     }
     
-    /* è®¡ç®—å½“å‰è¯»å–ä½ç½®çš„åç§»é‡ */
+    /* ¼ÆËãµ±Ç°¶ÁÈ¡Î»ÖÃµÄÆ«ÒÆÁ¿ */
     uint16_t offset = (uint16_t)queue->read_pos * queue->item_size;
     
-    /* å¤åˆ¶å½“å‰è¯»å–ä½ç½®çš„è®°å½• */
+    /* ¸´ÖÆµ±Ç°¶ÁÈ¡Î»ÖÃµÄ¼ÇÂ¼ */
     memcpy(record, (uint8_t *)queue->records + offset, queue->item_size);
     
-    /* æ›´æ–°è¯»å–ä½ç½®åˆ°ä¸‹ä¸€æ¡è®°å½•ï¼ˆå‘å°¾éƒ¨æ–¹å‘ç§»åŠ¨ï¼‰ */
+    /* ¸üĞÂ¶ÁÈ¡Î»ÖÃµ½ÏÂÒ»Ìõ¼ÇÂ¼£¨ÏòÎ²²¿·½ÏòÒÆ¶¯£© */
     if (queue->read_pos == queue->tail) {
-        // å·²ç»åˆ°è¾¾æœ€æ—§çš„è®°å½•
+        // ÒÑ¾­µ½´ï×î¾ÉµÄ¼ÇÂ¼
         return 1;
     } else {
         queue->read_pos = (queue->read_pos - 1 + queue->size) % queue->size;
@@ -114,11 +114,11 @@ uint8_t FIFO_GetNextRecord(fifo_queue_t *queue, void *record)
 /*********************************************************************
  * @fn      FIFO_ResetReadPos
  *
- * @brief   é‡ç½®è¯»å–ä½ç½®åˆ°æœ€æ–°è®°å½•
+ * @brief   ÖØÖÃ¶ÁÈ¡Î»ÖÃµ½×îĞÂ¼ÇÂ¼
  *
- * @param   queue - é˜Ÿåˆ—ç»“æ„ä½“æŒ‡é’ˆ
+ * @param   queue - ¶ÓÁĞ½á¹¹ÌåÖ¸Õë
  *
- * @return  æ— 
+ * @return  ÎŞ
  */
 void FIFO_ResetReadPos(fifo_queue_t *queue)
 {
@@ -130,11 +130,11 @@ void FIFO_ResetReadPos(fifo_queue_t *queue)
 /*********************************************************************
  * @fn      FIFO_Clear
  *
- * @brief   æ¸…ç©ºé˜Ÿåˆ—
+ * @brief   Çå¿Õ¶ÓÁĞ
  *
- * @param   queue - é˜Ÿåˆ—ç»“æ„ä½“æŒ‡é’ˆ
+ * @param   queue - ¶ÓÁĞ½á¹¹ÌåÖ¸Õë
  *
- * @return  æ— 
+ * @return  ÎŞ
  */
 void FIFO_Clear(fifo_queue_t *queue)
 {
@@ -142,12 +142,12 @@ void FIFO_Clear(fifo_queue_t *queue)
         return;
     }
     
-    /* æ¸…ç©ºè®°å½•æ•°ç»„ */
+    /* Çå¿Õ¼ÇÂ¼Êı×é */
     if (queue->records != NULL) {
         memset(queue->records, 0, queue->item_size * queue->size);
     }
     
-    /* é‡ç½®é˜Ÿåˆ—æŒ‡é’ˆ */
+    /* ÖØÖÃ¶ÓÁĞÖ¸Õë */
     queue->head = 0;
     queue->tail = 0;
     queue->count = 0;
@@ -157,11 +157,11 @@ void FIFO_Clear(fifo_queue_t *queue)
 /*********************************************************************
  * @fn      FIFO_GetCount
  *
- * @brief   è·å–é˜Ÿåˆ—ä¸­çš„è®°å½•æ•°é‡
+ * @brief   »ñÈ¡¶ÓÁĞÖĞµÄ¼ÇÂ¼ÊıÁ¿
  *
- * @param   queue - é˜Ÿåˆ—ç»“æ„ä½“æŒ‡é’ˆ
+ * @param   queue - ¶ÓÁĞ½á¹¹ÌåÖ¸Õë
  *
- * @return  è®°å½•æ•°é‡
+ * @return  ¼ÇÂ¼ÊıÁ¿
  */
 uint8_t FIFO_GetCount(fifo_queue_t *queue)
 {
@@ -174,11 +174,11 @@ uint8_t FIFO_GetCount(fifo_queue_t *queue)
 /*********************************************************************
  * @fn      FIFO_GetSize
  *
- * @brief   è·å–é˜Ÿåˆ—å¤§å°
+ * @brief   »ñÈ¡¶ÓÁĞ´óĞ¡
  *
- * @param   queue - é˜Ÿåˆ—ç»“æ„ä½“æŒ‡é’ˆ
+ * @param   queue - ¶ÓÁĞ½á¹¹ÌåÖ¸Õë
  *
- * @return  é˜Ÿåˆ—å¤§å°
+ * @return  ¶ÓÁĞ´óĞ¡
  */
 uint8_t FIFO_GetSize(fifo_queue_t *queue)
 {

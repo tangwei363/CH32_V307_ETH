@@ -10,6 +10,7 @@ RM := rm -rf
 -include sources.mk
 -include modbus/subdir.mk
 -include melsec_fx/subdir.mk
+-include https/subdir.mk
 -include User/subdir.mk
 -include Startup/subdir.mk
 -include Peripheral/src/subdir.mk

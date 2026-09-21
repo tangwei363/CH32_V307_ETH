@@ -91,8 +91,7 @@
 					"${project}/NetLib/eth_driver_CH32V317.c",
 					"${project}/https/index_Test.c",
 					"${project}/User/PING.c",
-					"${project}/User/PING.h",
-					"${project}/https"
+					"${project}/User/PING.h"
 				],
 				"optimization": {
 					"level": "size",

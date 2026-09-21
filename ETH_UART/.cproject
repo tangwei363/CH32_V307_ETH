@@ -276,7 +276,7 @@
             </toolChain>
           </folderInfo>
           <sourceEntries>
-            <entry excluding="NetLib/libwchnet_float.a|ETH_driver|Startup/startup_ch32v30x_D8.S|Startup/startup_ch32v30x.S|User/ping.c|User/ping.h|NetLib/eth_driver_RGMII.c|NetLib/eth_driver_RMII.c|NetLib/eth_driver_MII.c|NetLib/eth_driver_CH32V317.c|https/index_Test.c|User/PING.c|User/PING.h|https" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+            <entry excluding="NetLib/libwchnet_float.a|ETH_driver|Startup/startup_ch32v30x_D8.S|Startup/startup_ch32v30x.S|User/ping.c|User/ping.h|NetLib/eth_driver_RGMII.c|NetLib/eth_driver_RMII.c|NetLib/eth_driver_MII.c|NetLib/eth_driver_CH32V317.c|https/index_Test.c|User/PING.c|User/PING.h" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
           </sourceEntries>
         </configuration>
       </storageModule>

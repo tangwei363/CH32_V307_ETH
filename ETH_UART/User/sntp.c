@@ -453,15 +453,16 @@ int8_t Sntp_client_task( uint8_t phy_status )
 {
     extern _calendar_obj calendar;   // 日期时间对象
 
+    if (phy_status == 0) {
+        return 0;   // 物理链路未就绪, 不做事
+    }
+    
     /* 1Hz 节拍门控: main 循环无延时, 用秒变化保证每秒仅执行一次 */
     if (Nowdatetime.ss == calendar.sec) {
         return 0;
     }
     Nowdatetime.ss = calendar.sec;   // 记录本次秒, 同一秒内的后续调用直接返回
 
-    if (phy_status == 0) {
-        return 0;   // 物理链路未就绪, 不做事
-    }
 
     sntp_cfg_t sntp_cfg;
     sntp_cfg.raw = (uint8_t)(sntp_time.sntp_enable & 0xff);  // 获取SNTP功能配置

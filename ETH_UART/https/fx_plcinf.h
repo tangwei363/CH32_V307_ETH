@@ -3,7 +3,7 @@
  * Author             : AI Assistant
  * Version            : V1.0.0
  * Date               : 2026/03/16
- * Description        : ä¸‰è±FX3U-ENET-ADP PLCä¿¡æ¯é¡µé¢å¤´æ–‡ä»¶
+ * Description        : ÈıÁâFX3U-ENET-ADP PLCĞÅÏ¢Ò³ÃæÍ·ÎÄ¼ş
 *********************************************************************************
 * Copyright (c) 2026 AI Assistant. All rights reserved.
 *******************************************************************************/
@@ -17,69 +17,69 @@ extern "C" {
 
 #include <stdint.h>
 
-/* CPUç±»å‹å®šä¹‰ */
+/* CPUÀàĞÍ¶¨Òå */
 typedef enum {
     FX_PLC_CPU_FX3U = 0,       /* FX3U */
     FX_PLC_CPU_FX3UC,         /* FX3UC */
-    FX_PLC_CPU_UNKNOWN        /* æœªçŸ¥ */
+    FX_PLC_CPU_UNKNOWN        /* Î´Öª */
 } fx_plcinf_cpu_type_t;
 
-/* å­˜å‚¨å™¨ç±»å‹å®šä¹‰ */
+/* ´æ´¢Æ÷ÀàĞÍ¶¨Òå */
 typedef enum {
     FX_PLC_MEM_RAM = 0,       /* RAM */
     FX_PLC_MEM_EEPROM,        /* EEPROM */
     FX_PLC_MEM_FLASH,         /* FLASH */
-    FX_PLC_MEM_UNKNOWN        /* æœªçŸ¥ */
+    FX_PLC_MEM_UNKNOWN        /* Î´Öª */
 } fx_plcinf_mem_type_t;
 
-/* LEDçŠ¶æ€å®šä¹‰ */
+/* LED×´Ì¬¶¨Òå */
 typedef enum {
-    FX_PLC_LED_OFF = 0,       /* å…³é—­ */
-    FX_PLC_LED_ON,            /* æ‰“å¼€ */
-    FX_PLC_LED_GREEN,         /* ç»¿è‰² */
-    FX_PLC_LED_RED            /* çº¢è‰² */
+    FX_PLC_LED_OFF = 0,       /* ¹Ø±Õ */
+    FX_PLC_LED_ON,            /* ´ò¿ª */
+    FX_PLC_LED_GREEN,         /* ÂÌÉ« */
+    FX_PLC_LED_RED            /* ºìÉ« */
 } fx_plcinf_led_state_t;
 
-/* LEDç±»å‹å®šä¹‰ */
+/* LEDÀàĞÍ¶¨Òå */
 typedef enum {
-    FX_PLC_LED_POWER = 0,     /* ç”µæº */
-    FX_PLC_LED_RUN,           /* è¿è¡Œ */
-    FX_PLC_LED_BATT,          /* ç”µæ±  */
-    FX_PLC_LED_ERROR          /* é”™è¯¯ */
+    FX_PLC_LED_POWER = 0,     /* µçÔ´ */
+    FX_PLC_LED_RUN,           /* ÔËĞĞ */
+    FX_PLC_LED_BATT,          /* µç³Ø */
+    FX_PLC_LED_ERROR          /* ´íÎó */
 } fx_plcinf_led_type_t;
 
-/* ç›‘è§†çŠ¶æ€ */
+/* ¼àÊÓ×´Ì¬ */
 typedef enum {
-    FX_PLC_MONITOR_IDLE = 0,  /* ç©ºé—² */
-    FX_PLC_MONITOR_RUNNING,   /* ç›‘è§†æ‰§è¡Œä¸­ */
-    FX_PLC_MONITOR_STOPPED    /* å·²åœæ­¢ */
+    FX_PLC_MONITOR_IDLE = 0,  /* ¿ÕÏĞ */
+    FX_PLC_MONITOR_RUNNING,   /* ¼àÊÓÖ´ĞĞÖĞ */
+    FX_PLC_MONITOR_STOPPED    /* ÒÑÍ£Ö¹ */
 } fx_plcinf_monitor_state_t;
 
-/* é”™è¯¯ä¿¡æ¯ç»“æ„ä½“ */
+/* ´íÎóĞÅÏ¢½á¹¹Ìå */
 typedef struct {
-    uint8_t     error_no;      /* é”™è¯¯ç¼–å· */
-    uint16_t    error_step;    /* é”™è¯¯æ­¥ */
-    char        error_msg[32]; /* é”™è¯¯ä¿¡æ¯(64â†’32: ä¸è®°å½•æ•°åŒæ­¥å‹ç¼©, å›æ”¶SRAM) */
+    uint8_t     error_no;      /* ´íÎó±àºÅ */
+    uint16_t    error_step;    /* ´íÎó²½ */
+    char        error_msg[32]; /* ´íÎóĞÅÏ¢(64¡ú32: Óë¼ÇÂ¼ÊıÍ¬²½Ñ¹Ëõ, »ØÊÕSRAM) */
 } fx_plcinf_error_t;
 
-/* PLCä¿¡æ¯ç»“æ„ä½“ */
+/* PLCĞÅÏ¢½á¹¹Ìå */
 typedef struct {
     
-    fx_plcinf_cpu_type_t      cpu_type;        /* CPUç±»å‹ */
-    uint16_t                  cpu_version;     /* CPUç‰ˆæœ¬(BCDç , 3.15 = 0x0315) */
-    fx_plcinf_mem_type_t      mem_type;        /* å­˜å‚¨å™¨ç±»å‹ */
-    uint8_t                   battery_mode;    /* æ— ç”µæ± æ¨¡å¼: 0=æ— æ•ˆ, 1=æœ‰æ•ˆ */
+    fx_plcinf_cpu_type_t      cpu_type;        /* CPUÀàĞÍ */
+    uint16_t                  cpu_version;     /* CPU°æ±¾(BCDÂë, 3.15 = 0x0315) */
+    fx_plcinf_mem_type_t      mem_type;        /* ´æ´¢Æ÷ÀàĞÍ */
+    uint8_t                   battery_mode;    /* ÎŞµç³ØÄ£Ê½: 0=ÎŞĞ§, 1=ÓĞĞ§ */
 
-    fx_plcinf_led_state_t     led_power;       /* POWER LEDçŠ¶æ€ */
-    fx_plcinf_led_state_t     led_run;         /* RUN LEDçŠ¶æ€ */
-    fx_plcinf_led_state_t     led_batt;        /* BATT LEDçŠ¶æ€ */
-    fx_plcinf_led_state_t     led_error;       /* ERROR LEDçŠ¶æ€ */
+    fx_plcinf_led_state_t     led_power;       /* POWER LED×´Ì¬ */
+    fx_plcinf_led_state_t     led_run;         /* RUN LED×´Ì¬ */
+    fx_plcinf_led_state_t     led_batt;        /* BATT LED×´Ì¬ */
+    fx_plcinf_led_state_t     led_error;       /* ERROR LED×´Ì¬ */
 
 } fx_plcinf_info_t;
 
-#define FX_PLCINF_MAX_ERRORS  4   /* æœ€å¤§é”™è¯¯è®°å½•æ•°(10â†’4: g_errors ç”±680Bé™è‡³144B) */
+#define FX_PLCINF_MAX_ERRORS  4   /* ×î´ó´íÎó¼ÇÂ¼Êı(10¡ú4: g_errors ÓÉ680B½µÖÁ144B) */
 
-/* å‡½æ•°å£°æ˜ */
+/* º¯ÊıÉùÃ÷ */
 void FX_PLCINF_Init(void);
 void FX_PLCINF_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,char *url);
  
