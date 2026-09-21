@@ -52,15 +52,14 @@ static const char HTML_Component_Nav_Bar_New[] =
     "<table rules=\"all\" cellspacing=\"0\" cellpadding=\"0\" style=\"table-layout:fixed; font-size:12px; margin:0 auto;\"><tbody><tr><td align=\"center\" width=\"60\"><a href=\"index.html?LANG=ZS\">主页</a></td><td align=\"center\" width=\"220\"><a href=\"fx_devmon.html?LANG=ZS\">软元件/缓冲存储器批量监视</a></td><td align=\"center\" width=\"110\"><a href=\"fx_plcinf.html?CMD=%BC%E0%CA%D3%BF%AA%CA%BC&amp;LANG=ZS\">PLC信息</a></td><td align=\"center\" width=\"180\"><a href=\"fx_enetinf.html?CMD=%BC%E0%CA%D3%BF%AA%CA%BC&amp;LANG=ZS\">FX3U-ENET-ADP信息</a></td><td align=\"center\" width=\"140\"><a href=\"fx_status.html?CMD=%BC%E0%CA%D3%BF%AA%CA%BC&amp;LANG=ZS\">通信状态</a></td><td align=\"center\" width=\"90\"><a href=\"fx_acclog.html?CMD=%BC%E0%CA%D3%BF%AA%CA%BC&amp;LANG=ZS\">访问履历</a></td></tr></tbody></table>\r\n";
 
 /* ── 编译期防呆：分包缓冲容量校验（越界会写穿 BSS 导致死机）────────────
- * 各页面第一个分包是「HTML头部 + CSS」，第二个是「body开始 + 导航栏」，
- * 它们都 sprintf 进 HtmlBuffer[HTML_LEN]。一旦组件总长超过 HTML_LEN，
- * 就会越界覆盖紧随其后的 http_request / g_data_rows / g_monitor_config，
- * 表现为页面能显示但随即死机（历史故障根因）。
- * 下面两条断言把该校验提前到编译期：组件或缓冲长度失衡会直接编译失败。 */
-typedef char HTML_Assert_HeaderCss_Fits_HtmlBuffer[
-    ((sizeof(HTML_Component_Header) + sizeof(HTML_Component_CSS_New) + 32u) <= (unsigned)HTML_LEN) ? 1 : -1];
-typedef char HTML_Assert_BodyNav_Fits_HtmlBuffer[
-    ((sizeof(HTML_Component_Body_Start_New) + sizeof(HTML_Component_Nav_Bar_New) + 8u) <= (unsigned)HTML_LEN) ? 1 : -1];
+ * CSS 与导航栏组件已改为"绕过 HtmlBuffer 直发"(见各页面 SendWebPage)，
+ * 因此这里只校验仍然 sprintf 进 HtmlBuffer[HTML_LEN] 的 HTML 头部与刷新块。
+ * 历史故障：头部+CSS 超过 HTML_LEN 写穿 BSS，覆盖 http_request/g_data_rows，
+ * 表现为页面能显示但随即死机。 */
+typedef char HTML_Assert_Header_Fits_HtmlBuffer[
+    ((sizeof(HTML_Component_Header) + 64u) <= (unsigned)HTML_LEN) ? 1 : -1];
+typedef char HTML_Assert_Refresh_Fits_HtmlBuffer[
+    ((sizeof(HTML_Component_Refresh) + 16u) <= (unsigned)HTML_LEN) ? 1 : -1];
 
 /* 响应式导航栏 (fx_acclog.c等使用) */
 static const char HTML_Component_Nav_Bar_Responsive[] =

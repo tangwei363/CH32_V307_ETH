@@ -437,6 +437,14 @@ typedef struct ETH_SOCKET_Type
 extern SNTP_time    sntp_time;        // 时间设置
 extern Log_data     log_data;         // 日志记录数据
 extern ETH_SOCKET   eth_socket[8];    // 网络 SOCKET 数组
+
+/* ★ socket id 越界守卫（网络层/回调/映射表带进来的 id 可能越界）
+ * 直接 eth_socket[id] 会读写数组之外的 BSS —— 踩坏相邻全局变量 → 死机。
+ * 凡"以外部变量为下标"的访问统一走 ETH_S(id)：越界时钳到 0 号槽，
+ * 行为可控且绝不越界；需要"直接丢弃"的场合可用 ETH_SOCK_BAD(id) 判断。 */
+#define ETH_SOCK_BAD(id)   ((uint32_t)(id) >= (uint32_t)ETH_MAX_CONNECTIONS)
+#define ETH_SOCK_ID(id)    (ETH_SOCK_BAD(id) ? 0u : (uint8_t)(id))
+#define ETH_S(id)          (eth_socket[ETH_SOCK_ID(id)])
 extern net_monitor_state_t net_monitor_state; // 监视状态
 extern ETH_status   net_status;       // 网络使能状态
 extern ETH_connect  net_connect;      // 网络连接状态

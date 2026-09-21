@@ -184,7 +184,7 @@ static inline void MC_Net_Process_ReadCommand(uint8_t Sour_Sock ,uint8_t  Dest_S
                 {
                     MELSEC_DEBUG("C200 -- C255 点数指定为奇数 %d  \r\n", net_mc_meta.device_count);
                     // 软元件的指定有误( 字单位随机写入时，指定C200 ～ C255)
-                    eth_socket[Sour_Sock].Error_Code = 2555; 
+                    ETH_S(Sour_Sock).Error_Code = 2555; 
                     //报错 处理 命令字节长度不是规定长度     57H  
                     ethernet_error_code_ack(Sour_Sock,Dest_Sock,
                                             net_mc_meta.sub_header,
@@ -467,7 +467,7 @@ int MC_Net_binary_ParseRecvResp(uint8_t Sour_Sock ,uint8_t  Dest_Sock,uint8_t* f
     /* 远程RUN(13H)/STOP(14H)=4字节, 读写命令帧=13字节 */
     if (frame_len < 4) {
         MELSEC_DEBUG("帧长度不足 (len=%d, min=4)\r\n", frame_len);
-        eth_socket[Sour_Sock].Error_Code =   2558;//        命令、子命令的指定有误
+        ETH_S(Sour_Sock).Error_Code =   2558;//        命令、子命令的指定有误
         //报错 处理 命令字节长度不是规定长度     57H  
         ethernet_error_code_ack(Sour_Sock,Dest_Sock,
                                 frame_buff[0],
@@ -486,7 +486,7 @@ int MC_Net_binary_ParseRecvResp(uint8_t Sour_Sock ,uint8_t  Dest_Sock,uint8_t* f
     if(net_mc_meta.pc_number != 0xFF)
     {
         MELSEC_DEBUG("PC编号错误: 0x%02X\r\n", net_mc_meta.pc_number);
-        eth_socket[Sour_Sock].Error_Code =   2560; //   PC编号有误
+        ETH_S(Sour_Sock).Error_Code =   2560; //   PC编号有误
         //报错 处理 PC号错误(10H):指定了FF以外的PC号      5BH  
         ethernet_error_code_ack(Sour_Sock,Dest_Sock,
                                 net_mc_meta.sub_header,
@@ -524,7 +524,7 @@ int MC_Net_binary_ParseRecvResp(uint8_t Sour_Sock ,uint8_t  Dest_Sock,uint8_t* f
             sub_hdr != MC_CMD_PLC_MODEL   )  //      = 0x15,   // PLC可编程控制器的型号名 )    // 8字节表示 1个点数
         {
             MELSEC_DEBUG("设置的数据点数过多 (len=%d, min=4)\r\n", frame_len);
-            eth_socket[Sour_Sock].Error_Code =   2558;//        命令、子命令的指定有误
+            ETH_S(Sour_Sock).Error_Code =   2558;//        命令、子命令的指定有误
             //报错 处理 命令字节长度不是规定长度     57H  
             ethernet_error_code_ack(Sour_Sock,Dest_Sock,
                                     frame_buff[0],
@@ -549,7 +549,7 @@ int MC_Net_binary_ParseRecvResp(uint8_t Sour_Sock ,uint8_t  Dest_Sock,uint8_t* f
             if( dev_count > (frame_len-12)*2 ) // 一个字节表示2个点数
             {
                 MELSEC_DEBUG("设置的数据点数过多 (len=%d, min=4)\r\n", frame_len);
-                eth_socket[Sour_Sock].Error_Code =   2558;//        命令、子命令的指定有误
+                ETH_S(Sour_Sock).Error_Code =   2558;//        命令、子命令的指定有误
                 //报错 处理 命令字节长度不是规定长度     57H  
                 ethernet_error_code_ack(Sour_Sock,Dest_Sock,
                                         frame_buff[0],
@@ -574,7 +574,7 @@ int MC_Net_binary_ParseRecvResp(uint8_t Sour_Sock ,uint8_t  Dest_Sock,uint8_t* f
             if( dev_count > (frame_len-12)/2 )    // 2字节表示 1个点数
             {
                 MELSEC_DEBUG("设置的数据点数过多 (len=%d, min=4)\r\n", frame_len);
-                eth_socket[Sour_Sock].Error_Code =   2558;//        命令、子命令的指定有误
+                ETH_S(Sour_Sock).Error_Code =   2558;//        命令、子命令的指定有误
                 //报错 处理 命令字节长度不是规定长度     57H  
                 ethernet_error_code_ack(Sour_Sock,Dest_Sock,
                                         frame_buff[0],
@@ -585,7 +585,7 @@ int MC_Net_binary_ParseRecvResp(uint8_t Sour_Sock ,uint8_t  Dest_Sock,uint8_t* f
             // 在C200～C255的成批读出/成批写入中， 点数指定为奇数。
             if( net_mc_meta.device_name == MC_FX_CN && dev_start >= 200 && dev_count % 2 != 0) {
                 MELSEC_DEBUG("C200～C255 点数指定为奇数 %d  \r\n", dev_count);
-                eth_socket[Sour_Sock].Error_Code =   2553;// 软元件的指定有误(向C200～C255的访问，点数指定为奇数)      
+                ETH_S(Sour_Sock).Error_Code =   2553;// 软元件的指定有误(向C200～C255的访问，点数指定为奇数)      
                 //报错 处理 命令字节长度不是规定长度     57H  
                 ethernet_error_code_ack(Sour_Sock,Dest_Sock,
                                         frame_buff[0],
@@ -629,7 +629,7 @@ int MC_Net_binary_ParseRecvResp(uint8_t Sour_Sock ,uint8_t  Dest_Sock,uint8_t* f
             if( random_num > (frame_len-6)/7 )    // 7字节表示 1个点数
             {
                 MELSEC_DEBUG("设置的数据点数过多 (len=%d, min=4)\r\n", frame_len);
-                eth_socket[Sour_Sock].Error_Code =   2558;//        命令、子命令的指定有误
+                ETH_S(Sour_Sock).Error_Code =   2558;//        命令、子命令的指定有误
                 //报错 处理 命令字节长度不是规定长度     57H  
                 ethernet_error_code_ack(Sour_Sock,Dest_Sock,
                                         frame_buff[0],
@@ -671,7 +671,7 @@ int MC_Net_binary_ParseRecvResp(uint8_t Sour_Sock ,uint8_t  Dest_Sock,uint8_t* f
             if( random_num > (frame_len-6)/8 )    // 8字节表示 1个点数
             {
                 MELSEC_DEBUG("设置的数据点数过多 (len=%d, min=4)\r\n", frame_len);
-                eth_socket[Sour_Sock].Error_Code =   2558;//        命令、子命令的指定有误
+                ETH_S(Sour_Sock).Error_Code =   2558;//        命令、子命令的指定有误
                 //报错 处理 命令字节长度不是规定长度     57H  
                 ethernet_error_code_ack(Sour_Sock,Dest_Sock,
                                         frame_buff[0],
@@ -742,7 +742,7 @@ int MC_Net_binary_ParseRecvResp(uint8_t Sour_Sock ,uint8_t  Dest_Sock,uint8_t* f
         MELSEC_DEBUG("未知的MC命令: 0x%02X\r\n", net_mc_meta.sub_header);
         break;
     }
-    eth_socket[Sour_Sock].Error_Code = MC_END_NORMAL;
+    ETH_S(Sour_Sock).Error_Code = MC_END_NORMAL;
     return 0;
 }
 
@@ -1311,7 +1311,7 @@ int MC_Net_ASCII_ParseRecvResp(uint8_t Sour_Sock ,uint8_t  Dest_Sock,uint8_t *fr
         break;
     }
  
-    eth_socket[Sour_Sock].Error_Code = MC_END_NORMAL;
+    ETH_S(Sour_Sock).Error_Code = MC_END_NORMAL;
     return 0;
 }
 
@@ -1550,7 +1550,7 @@ int MC_Net_BuildModelResp(uint8_t Sour_Sock , uint8_t Dest_Sock,uint8_t type)
     }
 
     // 根据串口发送时的配置socket ID，来发送网络数据
-    ETH_SOCKET *eth_ptr = &eth_socket[Sour_Sock];
+    ETH_SOCKET *eth_ptr = &ETH_S(Sour_Sock);
     // 直接返回设备型号
     ethernet_send( Sour_Sock, Dest_Sock, tx_buf,offset,eth_ptr->destip, eth_ptr->destport);
 
@@ -1584,7 +1584,7 @@ int MC_Net_Build_EchoTest_Resp(uint8_t Sour_Sock , uint8_t Dest_Sock,uint8_t *Re
         offset = 4;
     }
     // 根据串口发送时的配置socket ID，来发送网络数据
-    ETH_SOCKET *eth_ptr = &eth_socket[Sour_Sock];
+    ETH_SOCKET *eth_ptr = &ETH_S(Sour_Sock);
     // 直接返回设备型号
     ethernet_send( Sour_Sock,Dest_Sock,Resp_data+offset,Resp_len-offset,eth_ptr->destip, eth_ptr->destport);
 
@@ -1600,9 +1600,9 @@ int MC_Net_BuildSendAbnormalResp(uint8_t Sour_Sock , uint8_t Dest_Sock )
     // 打包二进制格式数据
     uint16_t offset = 0;
     // 根据socket ID 找到对应的协议类型
-    uint8_t pro_t = eth_socket[Sour_Sock].Pro_Type ;
+    uint8_t pro_t = ETH_S(Sour_Sock).Pro_Type ;
     // 根据串口发送时的配置socket ID，来发送网络数据
-    ETH_SOCKET *eth_ptr = &eth_socket[Sour_Sock];
+    ETH_SOCKET *eth_ptr = &ETH_S(Sour_Sock);
     // 0xA6: TCP MC协议 0xA7: UDP MC协议
     if( pro_t == PRO_TCPC_MC  || pro_t ==  PRO_UDPC_MC )
     {

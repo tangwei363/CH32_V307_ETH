@@ -500,15 +500,15 @@ int MELSEC_FX_BuildBitReadCmd(uint8_t Sour_Sock ,uint8_t  Dest_Sock,
         MELSEC_DEBUG("BitRead address=0x%04X(%d) 映射失败\r\n", address, address);
         if( map_ret == MC_END_ILLEGAL_DEVICE )//(0x56) - 代码不匹配：全表未出现 e_code 相同的条目 (对方设备指定的软元件有误)
         {
-            eth_socket[Sour_Sock].Error_Code = 2551;   //软元件的指定有误(软元件种类为预想外)
+            ETH_S(Sour_Sock).Error_Code = 2551;   //软元件的指定有误(软元件种类为预想外)
         }
         else if( map_ret == MC_END_OUT_OF_RANGE)//(0x58) - 起点超区间：代码匹配, 但 eIndex 不在任何   [eStart,eEnd] 内(命令起始软元件号超出范围)
         {
-            eth_socket[Sour_Sock].Error_Code = 2552;   //软元件的指定有误(向位软元件以外读出/写入位单位)
+            ETH_S(Sour_Sock).Error_Code = 2552;   //软元件的指定有误(向位软元件以外读出/写入位单位)
         }
         else if( map_ret ==  MC_END_ILLEGAL_POINT_COUNT) //(0x57) - 点数超限：起点在范围内, 但 起点+点数-1 超过该条目 eEnd(起始元件号+指定点数 超最大地址)
         {
-            eth_socket[Sour_Sock].Error_Code = 2557;   //超过最大地址的读出/写入请求
+            ETH_S(Sour_Sock).Error_Code = 2557;   //超过最大地址的读出/写入请求
         }
         /* 报警: 将查表返回的 MC 结束代码(0x56/0x58...)回送给对方设备 */
         ethernet_error_code_ack(Sour_Sock, Dest_Sock, net_mc_meta.sub_header, (uint8_t)map_ret);
@@ -616,15 +616,15 @@ int MELSEC_FX_BuildBitWriteCmd(uint8_t Sour_Sock ,uint8_t  Dest_Sock,
         MELSEC_DEBUG("BitWrite address=0x%04X(%d) 映射失败\r\n", address, address);
         if( map_ret == MC_END_ILLEGAL_DEVICE )//(0x56) - 代码不匹配：全表未出现 e_code 相同的条目 (对方设备指定的软元件有误)
         {
-            eth_socket[Sour_Sock].Error_Code = 2551;   //软元件的指定有误(软元件种类为预想外)
+            ETH_S(Sour_Sock).Error_Code = 2551;   //软元件的指定有误(软元件种类为预想外)
         }
         else if( map_ret == MC_END_OUT_OF_RANGE)//(0x58) - 起点超区间：代码匹配, 但 eIndex 不在任何   [eStart,eEnd] 内(命令起始软元件号超出范围)
         {
-            eth_socket[Sour_Sock].Error_Code = 2552;   //软元件的指定有误(向位软元件以外读出/写入位单位)
+            ETH_S(Sour_Sock).Error_Code = 2552;   //软元件的指定有误(向位软元件以外读出/写入位单位)
         }
         else if( map_ret ==  MC_END_ILLEGAL_POINT_COUNT) //(0x57) - 点数超限：起点在范围内, 但 起点+点数-1 超过该条目 eEnd(起始元件号+指定点数 超最大地址)
         {
-            eth_socket[Sour_Sock].Error_Code = 2557;   //超过最大地址的读出/写入请求
+            ETH_S(Sour_Sock).Error_Code = 2557;   //超过最大地址的读出/写入请求
         }
         /* 报警: 将查表返回的 MC 结束代码(0x56/0x58...)回送给对方设备 */
         ethernet_error_code_ack(Sour_Sock, Dest_Sock, net_mc_meta.sub_header, (uint8_t)map_ret);
@@ -663,15 +663,15 @@ int MELSEC_FX_BuildWordWriteCmd(uint8_t Sour_Sock ,uint8_t  Dest_Sock,
         MELSEC_DEBUG("WordWrite address=0x%04X(%d) 映射失败\r\n", address, address);
         if( map_ret == MC_END_ILLEGAL_DEVICE )//(0x56) - 代码不匹配：全表未出现 e_code 相同的条目 (对方设备指定的软元件有误)
         {
-            eth_socket[Sour_Sock].Error_Code = 2551;   //软元件的指定有误(软元件种类为预想外)
+            ETH_S(Sour_Sock).Error_Code = 2551;   //软元件的指定有误(软元件种类为预想外)
         }
         else if( map_ret == MC_END_OUT_OF_RANGE)//(0x58) - 起点超区间：代码匹配, 但 eIndex 不在任何   [eStart,eEnd] 内(命令起始软元件号超出范围)
         {
-            eth_socket[Sour_Sock].Error_Code = 2552;   //软元件的指定有误(向位软元件以外读出/写入位单位)
+            ETH_S(Sour_Sock).Error_Code = 2552;   //软元件的指定有误(向位软元件以外读出/写入位单位)
         }
         else if( map_ret ==  MC_END_ILLEGAL_POINT_COUNT) //(0x57) - 点数超限：起点在范围内, 但 起点+点数-1 超过该条目 eEnd(起始元件号+指定点数 超最大地址)
         {
-            eth_socket[Sour_Sock].Error_Code = 2557;   //超过最大地址的读出/写入请求
+            ETH_S(Sour_Sock).Error_Code = 2557;   //超过最大地址的读出/写入请求
         }
         /* 报警: 将查表返回的 MC 结束代码(0x56/0x58...)回送给对方设备 */
         ethernet_error_code_ack(Sour_Sock, Dest_Sock, net_mc_meta.sub_header, (uint8_t)map_ret);
@@ -710,15 +710,15 @@ int MELSEC_FX_Build_E7_E8_ForceCmd(uint8_t Sour_Sock ,uint8_t  Dest_Sock, uint16
         MELSEC_DEBUG("E7_E8 address=0x%04X(%d) 映射失败\r\n", address, address);
         if( map_ret == MC_END_ILLEGAL_DEVICE )//(0x56) - 代码不匹配：全表未出现 e_code 相同的条目 (对方设备指定的软元件有误)
         {
-            eth_socket[Sour_Sock].Error_Code = 2551;   //软元件的指定有误(软元件种类为预想外)
+            ETH_S(Sour_Sock).Error_Code = 2551;   //软元件的指定有误(软元件种类为预想外)
         }
         else if( map_ret == MC_END_OUT_OF_RANGE)//(0x58) - 起点超区间：代码匹配, 但 eIndex 不在任何   [eStart,eEnd] 内(命令起始软元件号超出范围)
         {
-            eth_socket[Sour_Sock].Error_Code = 2552;   //软元件的指定有误(向位软元件以外读出/写入位单位)
+            ETH_S(Sour_Sock).Error_Code = 2552;   //软元件的指定有误(向位软元件以外读出/写入位单位)
         }
         else if( map_ret ==  MC_END_ILLEGAL_POINT_COUNT) //(0x57) - 点数超限：起点在范围内, 但 起点+点数-1 超过该条目 eEnd(起始元件号+指定点数 超最大地址)
         {
-            eth_socket[Sour_Sock].Error_Code = 2557;   //超过最大地址的读出/写入请求
+            ETH_S(Sour_Sock).Error_Code = 2557;   //超过最大地址的读出/写入请求
         }
         /* 报警: 将查表返回的 MC 结束代码(0x56/0x58...)回送给对方设备 */
         ethernet_error_code_ack(Sour_Sock, Dest_Sock, net_mc_meta.sub_header, (uint8_t)map_ret);
@@ -866,15 +866,15 @@ int MELSEC_FX_BuildE00ReadCmd(uint8_t Sour_Sock, uint8_t Dest_Sock,
         MELSEC_DEBUG("E00 address=0x%04X(%d) 映射失败\r\n", address, address);
         if( map_ret == MC_END_ILLEGAL_DEVICE )//(0x56) - 代码不匹配：全表未出现 e_code 相同的条目 (对方设备指定的软元件有误)
         {
-            eth_socket[Sour_Sock].Error_Code = 2551;   //软元件的指定有误(软元件种类为预想外)
+            ETH_S(Sour_Sock).Error_Code = 2551;   //软元件的指定有误(软元件种类为预想外)
         }
         else if( map_ret == MC_END_OUT_OF_RANGE)//(0x58) - 起点超区间：代码匹配, 但 eIndex 不在任何   [eStart,eEnd] 内(命令起始软元件号超出范围)
         {
-            eth_socket[Sour_Sock].Error_Code = 2552;   //软元件的指定有误(向位软元件以外读出/写入位单位)
+            ETH_S(Sour_Sock).Error_Code = 2552;   //软元件的指定有误(向位软元件以外读出/写入位单位)
         }
         else if( map_ret ==  MC_END_ILLEGAL_POINT_COUNT) //(0x57) - 点数超限：起点在范围内, 但 起点+点数-1 超过该条目 eEnd(起始元件号+指定点数 超最大地址)
         {
-            eth_socket[Sour_Sock].Error_Code = 2557;   //超过最大地址的读出/写入请求
+            ETH_S(Sour_Sock).Error_Code = 2557;   //超过最大地址的读出/写入请求
         }
         /* 报警: 将查表返回的 MC 结束代码(0x56/0x58...)回送给对方设备 */
         ethernet_error_code_ack(Sour_Sock, Dest_Sock, net_mc_meta.sub_header, (uint8_t)map_ret);
@@ -894,15 +894,15 @@ int MELSEC_FX_BuildE01ReadCmd(uint8_t Sour_Sock, uint8_t Dest_Sock,
         MELSEC_DEBUG("E01 address=0x%04X(%d) 映射失败\r\n", address, address);
         if( map_ret == MC_END_ILLEGAL_DEVICE )//(0x56) - 代码不匹配：全表未出现 e_code 相同的条目 (对方设备指定的软元件有误)
         {
-            eth_socket[Sour_Sock].Error_Code = 2551;   //软元件的指定有误(软元件种类为预想外)
+            ETH_S(Sour_Sock).Error_Code = 2551;   //软元件的指定有误(软元件种类为预想外)
         }
         else if( map_ret == MC_END_OUT_OF_RANGE)//(0x58) - 起点超区间：代码匹配, 但 eIndex 不在任何   [eStart,eEnd] 内(命令起始软元件号超出范围)
         {
-            eth_socket[Sour_Sock].Error_Code = 2552;   //软元件的指定有误(向位软元件以外读出/写入位单位)
+            ETH_S(Sour_Sock).Error_Code = 2552;   //软元件的指定有误(向位软元件以外读出/写入位单位)
         }
         else if( map_ret ==  MC_END_ILLEGAL_POINT_COUNT) //(0x57) - 点数超限：起点在范围内, 但 起点+点数-1 超过该条目 eEnd(起始元件号+指定点数 超最大地址)
         {
-            eth_socket[Sour_Sock].Error_Code = 2557;   //超过最大地址的读出/写入请求
+            ETH_S(Sour_Sock).Error_Code = 2557;   //超过最大地址的读出/写入请求
         }
         /* 报警: 将查表返回的 MC 结束代码(0x56/0x58...)回送给对方设备 */
         ethernet_error_code_ack(Sour_Sock, Dest_Sock, net_mc_meta.sub_header, (uint8_t)map_ret);
@@ -912,7 +912,7 @@ int MELSEC_FX_BuildE01ReadCmd(uint8_t Sour_Sock, uint8_t Dest_Sock,
     if(( address % 16 != 0  ) &&  MC_Net_DeviceCodeIsWord( net_mc_meta.device_name ) == 0   )
     {
         MELSEC_DEBUG("以字单位指令写入位软元件 address=0x%04X(%d) 需要==16的倍数  \r\n", address, address);
-        eth_socket[Sour_Sock].Error_Code = 2554;   // 软元件的指定有误(向位软元件的字单位访问时，起始软元件编号不是16的倍数)
+        ETH_S(Sour_Sock).Error_Code = 2554;   // 软元件的指定有误(向位软元件的字单位访问时，起始软元件编号不是16的倍数)
         /* 报警: 将查表返回的 MC 结束代码(0x56/0x58...)回送给对方设备 */
         ethernet_error_code_ack(Sour_Sock, Dest_Sock, net_mc_meta.sub_header, (uint8_t)MC_END_OUT_OF_RANGE);
         return MELSEC_FX_ERR_ADDR_RANGE;
@@ -929,14 +929,14 @@ int MELSEC_FX_BuildE06ReadCmd(uint8_t Sour_Sock, uint8_t Dest_Sock,
     //R0～R32767
     if(net_mc_meta.start_device + net_mc_meta.device_count > 32768 ){
         MELSEC_DEBUG("R0～R32767 软元件点数超出范围,  \n" ); // 32个字 (512点)
-        eth_socket[Sour_Sock].Error_Code = 2556;   //读出/写入点数在容许范围外
+        ETH_S(Sour_Sock).Error_Code = 2556;   //读出/写入点数在容许范围外
         //报错 处理  起始元件号+指定点数 超过最大地址(软元件号)      57H  
         ethernet_error_code_ack(Sour_Sock,Dest_Sock,
                     net_mc_meta.sub_header,
                     MC_END_ILLEGAL_POINT_COUNT ); 
         return MELSEC_FX_ERR_DEVICE_TYPE;
     }else if( net_mc_meta.start_device > 32767 ){
-        eth_socket[Sour_Sock].Error_Code = 2557;   //超过最大地址的读出/写入请求
+        ETH_S(Sour_Sock).Error_Code = 2557;   //超过最大地址的读出/写入请求
         //报错 处理  命令起始软元件号超出可指定范围    58H  
         ethernet_error_code_ack(Sour_Sock,Dest_Sock,
                             net_mc_meta.sub_header,
@@ -1018,15 +1018,15 @@ int MELSEC_FX_BuildE10WriteParamCmd(uint8_t Sour_Sock, uint8_t Dest_Sock,
         MELSEC_DEBUG("E10 address=0x%04X(%d) 映射失败error=0x%02X\r\n", address, address,map_ret);
         if( map_ret == MC_END_ILLEGAL_DEVICE )//(0x56) - 代码不匹配：全表未出现 e_code 相同的条目 (对方设备指定的软元件有误)
         {
-            eth_socket[Sour_Sock].Error_Code = 2551;   //软元件的指定有误(软元件种类为预想外)
+            ETH_S(Sour_Sock).Error_Code = 2551;   //软元件的指定有误(软元件种类为预想外)
         }
         else if( map_ret == MC_END_OUT_OF_RANGE)//(0x58) - 起点超区间：代码匹配, 但 eIndex 不在任何   [eStart,eEnd] 内(命令起始软元件号超出范围)
         {
-            eth_socket[Sour_Sock].Error_Code = 2552;   //软元件的指定有误(向位软元件以外读出/写入位单位)
+            ETH_S(Sour_Sock).Error_Code = 2552;   //软元件的指定有误(向位软元件以外读出/写入位单位)
         }
         else if( map_ret ==  MC_END_ILLEGAL_POINT_COUNT) //(0x57) - 点数超限：起点在范围内, 但 起点+点数-1 超过该条目 eEnd(起始元件号+指定点数 超最大地址)
         {
-            eth_socket[Sour_Sock].Error_Code = 2557;   //超过最大地址的读出/写入请求
+            ETH_S(Sour_Sock).Error_Code = 2557;   //超过最大地址的读出/写入请求
         }
         /* 报警: 将查表返回的 MC 结束代码(0x56/0x58...)回送给对方设备 */
         ethernet_error_code_ack(Sour_Sock, Dest_Sock, net_mc_meta.sub_header, (uint8_t)map_ret);
@@ -1036,7 +1036,7 @@ int MELSEC_FX_BuildE10WriteParamCmd(uint8_t Sour_Sock, uint8_t Dest_Sock,
     if(( address % 16 != 0  ) &&  MC_Net_DeviceCodeIsWord( net_mc_meta.device_name ) == 0   )
     {
         MELSEC_DEBUG("以字单位指令写入位软元件 address=0x%04X(%d) 需要==16的倍数  \r\n", address, address);
-        eth_socket[Sour_Sock].Error_Code = 2554;   //软元件的指定有误(向位软元件的字单位访问时，起始软元件编号不是16的倍数)
+        ETH_S(Sour_Sock).Error_Code = 2554;   //软元件的指定有误(向位软元件的字单位访问时，起始软元件编号不是16的倍数)
         /* 报警: 将查表返回的 MC 结束代码(0x56/0x58...)回送给对方设备 */
         ethernet_error_code_ack(Sour_Sock, Dest_Sock, net_mc_meta.sub_header, (uint8_t)MC_END_OUT_OF_RANGE);
         return MELSEC_FX_ERR_ADDR_RANGE;
@@ -1052,13 +1052,13 @@ int MELSEC_FX_Build_E16_write_R_Cmd(uint8_t Sour_Sock, uint8_t Dest_Sock,
 {
     //R0～R32767
     if(net_mc_meta.start_device+net_mc_meta.device_count > 32768 ){
-        eth_socket[Sour_Sock].Error_Code = 2557;   
+        ETH_S(Sour_Sock).Error_Code = 2557;   
         MELSEC_DEBUG("R0～R32767 软元件点数超出范围,  \n" ); // 32个字 (512点)
         //报错 处理  起始元件号+指定点数 超过最大地址(软元件号)      57H  
         ethernet_error_code_ack(Sour_Sock,Dest_Sock,net_mc_meta.sub_header,MC_END_ILLEGAL_POINT_COUNT ); 
         return MELSEC_FX_ERR_DEVICE_TYPE;
     }else if( net_mc_meta.start_device > 32768 ){
-         eth_socket[Sour_Sock].Error_Code = 2556;  
+         ETH_S(Sour_Sock).Error_Code = 2556;  
         //报错 处理  命令起始软元件号超出可指定范围    58H  
         ethernet_error_code_ack(Sour_Sock,Dest_Sock,net_mc_meta.sub_header,MC_END_OUT_OF_RANGE ); 
         return MELSEC_FX_ERR_ADDR_RANGE;

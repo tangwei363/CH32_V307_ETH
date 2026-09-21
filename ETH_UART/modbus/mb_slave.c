@@ -500,7 +500,7 @@ static int mb_send_response(uint8_t sock, uint8_t dest_sock,
 
     /* 复用工程既有的以太网发送接口(destip/destport 取自连接表) */
     ethernet_send(sock, dest_sock, adu, adu_len,
-                  eth_socket[sock].destip, eth_socket[sock].destport);
+                  ETH_S(sock).destip, ETH_S(sock).destport);
     return 0;
 }
 
@@ -537,7 +537,7 @@ static int mb_send_pdu_inplace(uint8_t sock, uint8_t dest_sock,
     mb_trace_response(trans_id, unit_id, &adu[7], pdu_len);
 
     ethernet_send(sock, dest_sock, adu, total,
-                  eth_socket[sock].destip, eth_socket[sock].destport);
+                  ETH_S(sock).destip, ETH_S(sock).destport);
     return 0;
 }
 

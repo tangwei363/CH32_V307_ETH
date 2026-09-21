@@ -1689,7 +1689,7 @@ void uartTxTimeoutCheck(void)
  
         if( uart_rx_ctx.Sour_Sockid < 8 && uart_rx_ctx.Dest_Sockid < 8 && net_status.bit.link_b7 == 1 ) {
             //在响应监视定时器值以内未能接收响应
-            eth_socket[uart_rx_ctx.Sour_Sockid].Error_Code = 2559;
+            ETH_S(uart_rx_ctx.Sour_Sockid).Error_Code = 2559;
             //报错 处理  = 0x60,   /* 60H: 以太网适配器和可编程控制器的通信时间  超过监视定时器值
             ethernet_error_code_ack(uart_rx_ctx.Sour_Sockid ,
                                     uart_rx_ctx.Dest_Sockid,

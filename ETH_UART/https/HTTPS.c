@@ -933,7 +933,7 @@ void SX_RawSend(u8 id, const uint8_t *dataptr, uint32_t datalen)
     }
 
     if (id < WCHNET_MAX_SOCKET_NUM) {
-        eth_socket[id].net_tx_packets += datalen;        /* net发送包数 */
+        ETH_S(id).net_tx_packets += datalen;        /* net发送包数 */
     }
 
     p = dataptr;

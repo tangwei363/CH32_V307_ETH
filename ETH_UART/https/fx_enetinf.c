@@ -518,13 +518,17 @@ void FX_ENETINF_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,char *url)
     /* 第一次打包: HTML头部和CSS样式 */
     offset = 0;
     offset += sprintf(temp_buffer + offset, HTML_GetComponent(HTML_COMP_HEADER), "FX3U-ENET-ADP信息");
-    offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_CSS_NEW));
-    Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
+    /* CSS 样式表直发：组件 >1.2KB，HtmlBuffer 装不下(越界会写穿 BSS 导致死机) */
+    Data_Send(Dest_Sock, (uint8_t*)HTML_GetComponent(HTML_COMP_CSS_NEW),
+              strlen(HTML_GetComponent(HTML_COMP_CSS_NEW)));
     /* 第二次打包: body开始到导航栏结束 (使用共享组件) */
     offset = 0;
     offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_BODY_START_NEW));
-    offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_NAV_BAR_NEW));
     Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
+
+    /* 导航栏直发：组件约 0.9KB，同样超过 HtmlBuffer 容量 */
+    Data_Send(Dest_Sock, (uint8_t*)HTML_GetComponent(HTML_COMP_NAV_BAR_NEW),
+              strlen(HTML_GetComponent(HTML_COMP_NAV_BAR_NEW)));
     /* 第四次打包: 表单开始和适配器信息标题 */
     offset = 0;
     offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_REFRESH));

@@ -62,7 +62,7 @@
 
 #define RES_END "\r\n\r\n"
 
-#define HTML_LEN     1600                         //Maximum size of a single web page(1024→768: 大页面走chunked流式, 此处仅作片段暂存)
+#define HTML_LEN     1024                         //Maximum size of a single web page(1024→768: 大页面走chunked流式, 此处仅作片段暂存)
 
 typedef struct _st_http_request                 //Browser request information
 {

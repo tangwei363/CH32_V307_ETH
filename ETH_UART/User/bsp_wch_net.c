@@ -262,7 +262,7 @@ void WCHNET_UdpServerRecv(struct _SOCK_INF *socinf, u32 ipaddr, u16 port, u8 *bu
         for (int S_id = 0; S_id < 8; S_id++)
         {
             // UDP 三重匹配: 本地端口 + 目标端口 + 目标IP
-            ETH_SOCKET *socket_p = &eth_socket[S_id];   /* 缓存指针，减少重复索引 */
+            ETH_SOCKET *socket_p = &ETH_S(S_id);   /* 缓存指针，减少重复索引 */
             if (socket_p->local_port == SocketInf_t->SourPort &&
                 socket_p->destport == port &&
                 memcmp(socket_p->destip, ip_addr, 4) == 0)
@@ -275,7 +275,7 @@ void WCHNET_UdpServerRecv(struct _SOCK_INF *socinf, u32 ipaddr, u16 port, u8 *bu
                 //ethernet_connect_set(S_id,1);      // UDP 连接成功
             #if SOCKET_HTTP_EN        
                 FX_ACCLOG_AddRecord(S_id, ETH_TYPE_UDP, 
-                                    eth_socket[S_id].Pro_Type,
+                                    ETH_S(S_id).Pro_Type,
                                     SocketInf_t->IPAddr);
                 WCHNET_UpdateAccLog();             //更新访问记录到PLC的寄存器中 
             #endif         
@@ -394,7 +394,7 @@ void WCHNET_ETHRx(u8 socketid)
                                 SocketInf_t->IPAddr,
                                 SocketInf_t->DesPort);
 
-        eth_socket[S_id].net_rx_packets += receive_len;        /* net tcp 接收包数 */
+        ETH_S(S_id).net_rx_packets += receive_len;        /* net tcp 接收包数 */
     }
 
     /***   回环测试    ***/
@@ -448,9 +448,9 @@ void WCHNET_HandleSockInt(u8 socketid, u8 intstat)
         for (S_id = 0; S_id < 8; S_id++)
         {
             /* 跳过未启用的 eth_socket 槽位，防止脏数据误匹配 */
-            if (!eth_socket[S_id].EN) continue;
+            if (!ETH_S(S_id).EN) continue;
 
-            if (eth_socket[S_id].local_port == SocketInf_t->SourPort)
+            if (ETH_S(S_id).local_port == SocketInf_t->SourPort)
             {
 
             #ifdef _BSP_WCH_DEBUG    
@@ -468,7 +468,7 @@ void WCHNET_HandleSockInt(u8 socketid, u8 intstat)
                 socket_ctrl[socketid].eth_sid = S_id;              /* 缓存映射：后续 RECV 时 O(1) 查找 */
             #if SOCKET_HTTP_EN  
                 FX_ACCLOG_AddRecord(S_id, ETH_TYPE_TCP,
-                                    eth_socket[S_id].Pro_Type,
+                                    ETH_S(S_id).Pro_Type,
                                     SocketInf_t->IPAddr);         /* 记录访问日志 */
                 WCHNET_UpdateAccLog();                            /* 同步日志到 PLC */
             #endif         
@@ -491,10 +491,10 @@ void WCHNET_HandleSockInt(u8 socketid, u8 intstat)
         for (S_id = 0; S_id < 8; S_id++)
         {
             /* 跳过未启用的槽位 */
-            if (!eth_socket[S_id].EN) continue;
+            if (!ETH_S(S_id).EN) continue;
 
-            if (eth_socket[S_id].local_port == SocketInf_t->SourPort &&
-                eth_socket[S_id].Pro_Type != 0xA7)                /* 排除 UDP MC 协议 */
+            if (ETH_S(S_id).local_port == SocketInf_t->SourPort &&
+                ETH_S(S_id).Pro_Type != 0xA7)                /* 排除 UDP MC 协议 */
             {
             #if SOCKET_PHY_LINK_EN    
                 ethernet_connect_set(S_id,&SocketInf_t->IPAddr[0],SocketInf_t->DesPort, 0);                    /* 标记：连接已断开 */
@@ -535,10 +535,10 @@ void WCHNET_HandleSockInt(u8 socketid, u8 intstat)
         for (S_id = 0; S_id < 8; S_id++)
         {
             /* 跳过未启用的槽位 */
-            if (!eth_socket[S_id].EN) continue;
+            if (!ETH_S(S_id).EN) continue;
 
-            if (eth_socket[S_id].local_port == SocketInf_t->SourPort &&
-                eth_socket[S_id].Pro_Type == 0xA8)                /* 仅处理 HTTP 数据监控连接 */
+            if (ETH_S(S_id).local_port == SocketInf_t->SourPort &&
+                ETH_S(S_id).Pro_Type == 0xA8)                /* 仅处理 HTTP 数据监控连接 */
             {
                 WCHNET_SocketClose(socketid, TCP_CLOSE_NORMAL);   /* 关闭底层 socket */
                 WCH_DEBUG("HTTP socket timeout, closed directly\r\n");

@@ -197,12 +197,12 @@ void ethernet_send(uint8_t Sour_Sock ,uint8_t  Dest_Sock, uint8_t *buf, uint16_t
         return;
     }
     ETHERNET_DEBUG("t:%ums ETHTx S_id =%d D_id = %d \n", synch_time_get() ,Sour_Sock,Dest_Sock);
-    eth_socket[Sour_Sock].net_tx_packets += len;        /* net发送包数 */   
+    ETH_S(Sour_Sock).net_tx_packets += len;        /* net发送包数 */   
     #if NET_LED_ENABLE == 1
     NEN_TX_LED_Trigger();  // 触发发送LED闪烁
     #endif //NET_LED_ENABLE == 1
     // 根据协议类型发送数据
-    switch (eth_socket[Sour_Sock].Eth_Type) {
+    switch (ETH_S(Sour_Sock).Eth_Type) {
         case ETH_TYPE_TCP:
             // TCP 重发机制 
             do {
@@ -260,7 +260,7 @@ void ethernet_error_code_ack (uint8_t Sour_Sock,uint8_t Dest_Sock,uint8_t sub_he
     if(Sour_Sock > 7 )
         return;
 
-    ETH_SOCKET *socket_p = &eth_socket[Sour_Sock];
+    ETH_SOCKET *socket_p = &ETH_S(Sour_Sock);
 
     uint8_t  sub   = (uint8_t)(sub_header | 0x80); // 子标题最高位置一(应答标志)
     uint8_t  txbuf[4] = {0};                       // ASCII 模式最多 4 字节(每字节 2 字符)
@@ -716,7 +716,7 @@ void wizchip_EE_net_link_info_to_PLC(uint8_t Sour_Sock,uint8_t link_state)
     uint8_t net_link_buff[sizeof(eth_link_t)] = {0};
     eth_link_t *eth_link_p = (eth_link_t *)net_link_buff;
 
-    ETH_SOCKET *sock = &eth_socket[Sour_Sock];
+    ETH_SOCKET *sock = &ETH_S(Sour_Sock);
 
     /* 本站端口号 - 高低字节交换(PLC大端序) */
     eth_link_p->link_id = SWAP_BYTES(sock->local_port);
@@ -780,7 +780,7 @@ void wizchip_updata_socket_to_PLC(uint8_t Sour_Sock,uint8_t link_state)
     /* 构建网络连接状态信息，eth_link_t结构体占16字节 */
     uint8_t net_link_buff[sizeof(eth_link_t)] = {0};
     eth_link_t *eth_link_p = (eth_link_t *)net_link_buff;
-    ETH_SOCKET *sock = &eth_socket[Sour_Sock];
+    ETH_SOCKET *sock = &ETH_S(Sour_Sock);
     /* 单独 更新 网络连接 状态 */
     /* 错误代码 - 高低字节交换 */
     eth_link_p->error_code = SWAP_BYTES(sock->Error_Code); 
@@ -813,7 +813,7 @@ void ethernet_connect_set( uint8_t Sour_Sock_id , uint8_t *destip, uint16_t dest
 {
     if(Sour_Sock_id < 8   )   
     {
-        ETH_SOCKET *sock = &eth_socket[Sour_Sock_id];
+        ETH_SOCKET *sock = &ETH_S(Sour_Sock_id);
         memcpy(sock->destip, destip, 4);          // IP地址(拷贝 destip 指向的 4 字节, 勿取 &destip 指针本身)
         sock->destport = destport;                // 端口号(按值直接赋值, 语义更清晰)
         // 网络连接状态
@@ -826,7 +826,7 @@ void ethernet_connect_set( uint8_t Sour_Sock_id , uint8_t *destip, uint16_t dest
             wizchip_updata_socket_to_PLC(Sour_Sock_id, state);      //更新socket 状态 到PLC 
         }
 
-        if( eth_socket[Sour_Sock_id].Pro_Type == PRO_TCPC_MELSOFT )
+        if( ETH_S(Sour_Sock_id).Pro_Type == PRO_TCPC_MELSOFT )
             net_monitor_state = state ? FX_MONITOR_RUNNING:FX_MONITOR_STOPPED; // 监视状态
         
         ETHERNET_DEBUG("连接号:%d ,%s\r\n",Sour_Sock_id,(state?"连接中":"断开"));
@@ -1543,7 +1543,7 @@ void sim_Process_switch(uint8_t *buf, uint16_t len)
     if (Sour_Sock < WCHNET_MAX_SOCKET_NUM)
     {
         /* ─── 分支1：根据协议类型路由响应 ─── */
-        ETH_SOCKET *eth_ptr = &eth_socket[Sour_Sock];
+        ETH_SOCKET *eth_ptr = &ETH_S(Sour_Sock);
         uint8_t  pro_t = eth_ptr->Pro_Type;
         /* 串口链路被 MC/Modbus 共用，周期性内部上报
          * (wizchip_*_to_PLC → MELSEC_FX_BuildEEWriteCmd(0xFF, 0xFF, ...)) 会把
@@ -1598,7 +1598,7 @@ void sim_Process_switch(uint8_t *buf, uint16_t len)
             {
                 // 透传数据到上位机
                 sim_Process_TCP_MELSOFT(Dest_Sock,buf, len);
-                eth_socket[Sour_Sock].net_tx_packets += len;        /* net发送包数 */   
+                ETH_S(Sour_Sock).net_tx_packets += len;        /* net发送包数 */   
             }break;
         }
     }
@@ -1636,7 +1636,7 @@ int  Analysis_eth_frame_handler(uint8_t Sour_Sock ,uint8_t  Dest_Sock,
     // ETHERNET_DEBUG("\r\n========================\r\n");
     // #endif
     // 根据socket ID 找到对应的协议类型
-    PRO_Type Pro_Type = eth_socket[Sour_Sock].Pro_Type ;
+    PRO_Type Pro_Type = ETH_S(Sour_Sock).Pro_Type ;
  
     ETHERNET_DEBUG("\nt:%ums ,Net rx len= %d, Sour_Sock=%d,Dest_Sock=%d, Pro_Type=0x%02X \r\n" ,
                         synch_state_time ,
@@ -1668,7 +1668,7 @@ int  Analysis_eth_frame_handler(uint8_t Sour_Sock ,uint8_t  Dest_Sock,
                     return 0;
                 }
                 //报错 处理  超出范围  副标题的命令 (00～05H， 13～16H)的代码。
-                eth_socket[Sour_Sock].Error_Code = 2558; //命令、子命令的指定有误      
+                ETH_S(Sour_Sock).Error_Code = 2558; //命令、子命令的指定有误      
                 ethernet_error_code_ack(Sour_Sock,Dest_Sock, frame_buff[0],MC_END_ILLEGAL_SUBTITLE );
             } else {
                 //ETHERNET_DEBUG("MC 协议 :ascii格式的协议数据\r\n");
@@ -1679,7 +1679,7 @@ int  Analysis_eth_frame_handler(uint8_t Sour_Sock ,uint8_t  Dest_Sock,
                     return 0;
                 } 
                 //报错 处理  超出范围  副标题的命令 (00～05H， 13～16H)的代码。   
-                eth_socket[Sour_Sock].Error_Code = 2558; //命令、子命令的指定有误       
+                ETH_S(Sour_Sock).Error_Code = 2558; //命令、子命令的指定有误       
                 ethernet_error_code_ack(Sour_Sock,Dest_Sock, header_ascii,MC_END_ILLEGAL_SUBTITLE );
             }
 

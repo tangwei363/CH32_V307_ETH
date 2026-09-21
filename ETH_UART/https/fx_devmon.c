@@ -803,7 +803,7 @@ static void FX_DEVMON_SendDataRows(uint8_t Dest_Sock, int start_row, int end_row
         offset += sprintf(temp_buffer + offset, "</tr>\r\n");
 
         /* 数据量达到阈值时发送 */
-        if (offset > 900) {
+        if (offset > 450) {
             Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
             offset = 0;
         }
@@ -849,7 +849,7 @@ static void FX_DEVMON_SendDataRows(uint8_t Dest_Sock, int start_row, int end_row
         offset += sprintf(temp_buffer + offset, "<td>&nbsp;</td>\r\n");
         offset += sprintf(temp_buffer + offset, "</tr>\r\n");
         
-        if (offset > 900) {
+        if (offset > 450) {
             Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
             offset = 0;
         }
@@ -978,8 +978,9 @@ void FX_DEVMON_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,  char *url)
 
     /* 第二次打包: CSS 样式表 */
     offset = 0;
-    offset += sprintf(temp_buffer + offset, "%s", HTML_GetComponent(HTML_COMP_CSS_NEW));
-    Data_Send(Dest_Sock, (uint8_t*)temp_buffer, offset);
+    /* CSS 样式表直发：组件 >1.2KB，HtmlBuffer 装不下(越界会写穿 BSS 导致死机) */
+    Data_Send(Dest_Sock, (uint8_t*)HTML_GetComponent(HTML_COMP_CSS_NEW),
+              strlen(HTML_GetComponent(HTML_COMP_CSS_NEW)));
 
     /* 第二次打包: body开始到导航栏结束 (使用共享组件) */
     offset = 0;
