@@ -75,11 +75,15 @@ typedef struct eth_log_time_t
     uint16_t second;                // 秒 0x000f  15秒
 }eth_log_time_t;
 
-//错误日志记录数据  15字节*2
+/* 错误日志记录数据 —— ★ 已与 fx_enetinf.h 的 fx_enetinf_error_log_t 统一为"含开放方式"的
+ * 17 字布局（此前是 15 字、缺 open_type，导致回写 PLC 时字段整体错位 2 字）。
+ * 字段顺序：连接号 / 协议类型 / 开放方式 / 本站端口号 / 错误代码 /
+ *          对象IP(4字节) / 对象端口号 / 指令代码 / 保留1 / 保留2 / 日志时间 */
 typedef struct eth_err_log_t
 {
     uint16_t connection_id;          // 连接号       0x03
-    uint16_t protocol_type;         // 协议类型     0xA702  udp mc协议
+    uint16_t protocol_type;         // 协议类型     0x0102:TCP / 0x0202:UDP
+    uint16_t open_type;             // 开放方式     0xA0~0xA9（Pro_Type 原始编码）
     uint16_t local_port;            // 本站端口号   0x138a
     uint16_t error_code;            // 错误代码     0x09fe
     uint8_t remote_ip[4];           // 通信对象IP地址 0x01e0c0a8  (IPv4格式)

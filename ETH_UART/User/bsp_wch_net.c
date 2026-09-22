@@ -18,6 +18,7 @@ please refer to the "CH32V30x Evaluation Board Manual" under the CH32V307EVT\EVT
 #include "bsp_flash.h"
 #include "ethernet_app.h"
 #include "fx_acclog.h"
+#include "fx_enetinf.h"     /* FX_ENETINF_ACCLOG_AddRecord / FX_ENETINF_ERR_TIMEOUT */
 
 #include "sntp.h"
 #include "HTTPS.h"
@@ -273,7 +274,9 @@ void WCHNET_UdpServerRecv(struct _SOCK_INF *socinf, u32 ipaddr, u16 port, u8 *bu
                 FX_ACCLOG_AddRecord(S_id, ETH_TYPE_UDP, 
                                     ETH_S(S_id).Pro_Type,
                                     SocketInf_t->IPAddr);
-                WCHNET_UpdateAccLog();             //更新访问记录到PLC的寄存器中 
+                /* 访问履历的上传已改为"置脏 + 主循环 FX_ACCLOG_Task()"：
+                 * 原处直接调用 WCHNET_UpdateAccLog()，内部 Delay_Ms(50)×N 会卡住
+                 * socket 事件处理（见 fx_acclog.c 说明）。 */
             #endif         
                 break;
             }
@@ -463,7 +466,7 @@ void WCHNET_HandleSockInt(u8 socketid, u8 intstat)
                 FX_ACCLOG_AddRecord(S_id, ETH_TYPE_TCP,
                                     ETH_S(S_id).Pro_Type,
                                     SocketInf_t->IPAddr);         /* 记录访问日志 */
-                WCHNET_UpdateAccLog();                            /* 同步日志到 PLC */
+                /* 上传交给主循环 FX_ACCLOG_Task()（此处不再直接调用，避免阻塞事件回调） */
             #endif         
                 break;
             }
@@ -535,6 +538,22 @@ void WCHNET_HandleSockInt(u8 socketid, u8 intstat)
             {
                 WCHNET_SocketClose(socketid, TCP_CLOSE_NORMAL);   /* 关闭底层 socket */
                 WCH_DEBUG("HTTP socket timeout, closed directly\r\n");
+
+                /* ★ 错误履历（补充触发点）：超时属于"没有任何应答"的场景 ——
+                 *   不会走到 ethernet_error_code_ack()，所以必须在这里单独落一条履历，
+                 *   否则用户看不到任何"为什么断了"的记录。
+                 *   错误代码用本模块约定值 0x00FE(通信超时)；指令代码置 0(无 MC 请求)。
+                 *   本处位于 socket 事件上下文：只入队 + 置标志，串口上传承由主循环完成。 */
+            #if SOCKET_HTTP_EN
+                FX_ENETINF_ACCLOG_AddRecord((uint16_t)S_id,
+                                            (uint8_t)ETH_TYPE_TCP,
+                                            (uint8_t)ETH_S(S_id).Pro_Type,
+                                            ETH_S(S_id).local_port,
+                                            (uint16_t)FX_ENETINF_ERR_TIMEOUT,
+                                            SocketInf_t->IPAddr,
+                                            SocketInf_t->DesPort,
+                                            0u);
+            #endif
 
             #if SOCKET_PHY_LINK_EN    
                 ethernet_connect_set(S_id,&SocketInf_t->IPAddr[0],SocketInf_t->DesPort, 0);  /* 标记：连接已断开 */

@@ -10,6 +10,7 @@
 
 #include <string.h>
 #include "fifo_queue.h"
+#include "ch32v30x.h"   /* __disable_irq()/__enable_irq()：索引更新需成组完成（写者可能在事件上下文） */
 
 /*********************************************************************
  * @fn      FIFO_Init
@@ -60,25 +61,66 @@ void FIFO_AddRecord(fifo_queue_t *queue, void *record)
         return;
     }
     
-    /* 计算当前记录的偏移量 */
+    /* ① 先把记录体写入目标槽位：此刻 head/count 还没动，读者（按 count 判定）
+     *    不会引用到"还没写完"的槽位。 */
     uint16_t offset = (uint16_t)queue->head * queue->item_size;
-    
-    /* 添加新记录到队列头部 */
     memcpy((uint8_t *)queue->records + offset, record, queue->item_size);
-    
-    /* 更新队列指针 */
+
+    /* ② 索引更新必须成组完成：本函数可能由 socket 事件上下文调用，而主循环里的
+     *    "渲染/上传"正在读 head/tail/count/read_pos，非原子会读到"半更新"的环
+     *    （现象：履历重复行/跳号/顺序错乱，且难以复现）。
+     *    注：本工程的生产者与消费者都在主循环，这里的临界区是防御性措施。 */
+    __disable_irq();
     queue->head = (queue->head + 1) % queue->size;
-    
     /* 如果队列已满，更新尾部指针（替换最旧的记录） */
     if (queue->count >= queue->size) {
         queue->tail = (queue->tail + 1) % queue->size;
     } else {
         queue->count++;
     }
-    
     /* 重置读取位置到最新记录 */
-    queue->read_pos = (queue->head - 1 + queue->size) % queue->size;
+    queue->read_pos = (uint8_t)((queue->head - 1 + queue->size) % queue->size);
+    __enable_irq();
 }
+
+/*********************************************************************
+ * @fn      FIFO_GetByAge
+ *
+ * @brief   按"龄"读取记录（age 0 = 最新），不改变任何游标
+ *
+ * @param   queue - 队列结构体指针
+ *          age - 0 = 最新，1 = 次新 …（age >= count 时返回 0）
+ *          record - 输出缓冲（>= item_size）
+ *
+ * @return  1 - 成功；0 - 无该龄记录或参数非法
+ */
+uint8_t FIFO_GetByAge(fifo_queue_t *queue, uint8_t age, void *record)
+{
+    uint8_t head, size, count, idx;
+
+    if (queue == NULL || record == NULL || queue->records == NULL || queue->size == 0u) {
+        return 0;
+    }
+
+    /* 三个索引必须"同一时刻"读取（写者可能在事件上下文更新它们） */
+    __disable_irq();
+    head  = queue->head;
+    size  = queue->size;
+    count = queue->count;
+    __enable_irq();
+
+    if (age >= count) {
+        return 0;                                       /* 该龄还没有记录 */
+    }
+    /* (head - 1 - age) 取模：用 uint16 中间量，避免 uint8 溢出（head/size 接近 255 时） */
+    idx = (uint8_t)(((uint16_t)head + size - 1u - age) % size);
+    memcpy(record, (uint8_t *)queue->records + (uint16_t)idx * queue->item_size,
+           queue->item_size);
+    return 1;
+}
+
+/* 说明：曾计划提供 FIFO_GetOldestAge()（返回 count-1）供页面决定"要画几行"，
+ * 但表格需要固定 8 行（不足的行用空行补齐），用不到该信息，故未保留。 */
 
 /*********************************************************************
  * @fn      FIFO_GetNextRecord

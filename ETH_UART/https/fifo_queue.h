@@ -67,6 +67,17 @@ uint8_t FIFO_GetNextRecord(fifo_queue_t *queue, void *record);
 void FIFO_ResetReadPos(fifo_queue_t *queue);
 
 /**
+ * @brief 按"龄"读取记录（age 0 = 最新；不改变任何游标，因此可多读者并发）
+ * @param queue - 队列结构体指针
+ * @param age - 0 = 最新，1 = 次新 …（age >= count 时返回 0）
+ * @param record - 输出缓冲（由调用方保证 >= item_size）
+ * @return 1 - 成功获取，0 - 该"龄"无记录/参数非法
+ * @note 与 FIFO_GetNextRecord 的区别：后者依赖共享的 read_pos 游标（有副作用），
+ *       本函数无副作用，适合"渲染/上传"这类可重入的遍历场景。
+ */
+uint8_t FIFO_GetByAge(fifo_queue_t *queue, uint8_t age, void *record);
+
+/**
  * @brief 清空队列
  * @param queue - 队列结构体指针
  * @return 无

@@ -20,6 +20,8 @@
 /* 全局变量定义 */
 fx_acclog_record_t g_access_logs[FX_ACCLOG_MAX_RECORDS];
 fx_acclog_fifo_t g_access_fifo = {0};
+/* 1 = 队列里有尚未上传到 PLC 的访问履历（添加路径置位，主循环 FX_ACCLOG_Task 消费） */
+static uint8_t g_access_logs_dirty = 0;
  
 /* 静态函数声明 */
 static void FX_ACCLOG_SendAccessTable(uint8_t Dest_Sock);
@@ -93,6 +95,11 @@ void FX_ACCLOG_AddRecord(uint16_t conn_id, uint8_t protocol, uint8_t open_type, 
         return;
     }
     fx_acclog_record_t record;
+
+    /* ★ 整体清零：保留字段与结构体填充字节会被原样写入 PLC（见 WCHNET_UpdateAccLog），
+     *   不清零就等于把栈上垃圾写进 PLC 寄存器。 */
+    memset(&record, 0, sizeof(record));
+
     // 更新RTC实时时钟       
     RTC_Get();
     record.log_time.year = calendar.w_year;
@@ -103,7 +110,10 @@ void FX_ACCLOG_AddRecord(uint16_t conn_id, uint8_t protocol, uint8_t open_type, 
     record.log_time.second = calendar.sec;
     record.conn_id = conn_id;  // 连接号 
     record.protocol = protocol; // 协议类型 TCP / UDP
-    record.open_type = 0x02FF & open_type; // 开放方式 
+    /* 开放方式：直接用 Pro_Type 原始编码(0xA0/0xA6/0xA7/0xA8…)。
+     * "0x02FF & open_type" 属无意义掩码（形参已是 uint8_t），若调用方按 PLC 的 0x02xx
+     * 编码传入还会把高位截断，使页面显示退化为 "----"。映射由 FX_ACCLOG_OpenStr() 完成。 */
+    record.open_type = open_type; // 开放方式 
     memcpy(record.remote_ip, remote_ip, 4);
 
     /* 去重: 检查上一条记录是否相同(conn_id + remote_ip), 相同则跳过 */
@@ -138,6 +148,10 @@ void FX_ACCLOG_AddRecord(uint16_t conn_id, uint8_t protocol, uint8_t open_type, 
     /* 添加新记录到队列 */
     FIFO_AddRecord(&g_access_fifo, &record);
 
+    /* ★ 置"待上传"标志：真正的 PLC 写入交给主循环 FX_ACCLOG_Task()。
+     *   原实现在 socket 事件回调里直接调用 WCHNET_UpdateAccLog()，内部 Delay_Ms(50)×N
+     *   （N 最多 8 ? 最长 400ms）会把事件处理卡住 ? 现在这里只置标志、立即返回。 */
+    g_access_logs_dirty = 1;
 }
 
 /*********************************************************************
@@ -219,27 +233,31 @@ void WCHNET_UpdateAccLog(void)
     /* 获取实际记录数量（不超过配置的最大记录件数） */
     uint8_t record_count = FX_ACCLOG_GetRecordCount();
     uint8_t write_count = (record_count < log_data.access_log_target_cnt) ? record_count : log_data.access_log_target_cnt;
+
+    /* 未使能（件数为 0 或寄存器类型非法）：不做串口动作，并清掉"待上传"标志 */
+    if (write_count == 0u || log_data.access_log_target_reg == 0u) {
+        g_access_logs_dirty = 0;
+        return;
+    }
+
     #ifdef _FX_ACCLOG_DEBUG
         FX_ACCLOG_DEBUG("访问记录更新到PLC寄存器，共写入 %d 条记录\r\n", write_count );
         FX_ACCLOG_DEBUG("目标寄存器类型: %d ,%s\r\n", 
                             log_data.access_log_target_reg ,
                             (log_data.access_log_target_reg == 0x02 )? "R寄存器" : "D寄存器");    
     #endif
-    if (write_count == 0) {
-        return;
-    }
-
 
     /* 获取寄存器起始地址 */
     uint16_t start_device = log_data.access_log_index;
     uint16_t record_size = sizeof(fx_acclog_record_t) / sizeof(uint16_t);
 
-    /* 遍历并写入最新的 access_log_target_cnt 条记录 */
+    /* 遍历并写入最新的 write_count 条记录：改为"按龄访问"(0 = 最新)，不再使用 FIFO 的
+     * 共享游标 —— 否则"页面渲染"与"上传 PLC"会互相偷记录（都依赖同一个 read_pos），
+     * 现象是表格里记录重复/缺行，且随刷新时机变化。 */
     fx_acclog_record_t record;
     for (uint8_t i = 0; i < write_count; i++) 
     {
-        //按顺序获取下一条访问履历（从头到尾）
-        if (!FX_ACCLOG_GetNextRecord(&record)) {
+        if (!FIFO_GetByAge(&g_access_fifo, i, &record)) {
             break;
         }
         /* 根据配置选择寄存器类型 */
@@ -257,9 +275,30 @@ void WCHNET_UpdateAccLog(void)
         /* 短暂延迟确保数据发送完成 */
         Delay_Ms(50);
     }
-        
-    /* 重置读取位置到最新记录 */
-    FX_ACCLOG_ResetReadPos();
+
+    g_access_logs_dirty = 0;
+    FX_ACCLOG_DEBUG("访问履历上传PLC: %d 条, 起始=%d, 每条=%d 字\r\n",
+                    write_count, (int)log_data.access_log_index, (int)record_size);
+}
+
+/*********************************************************************
+ * @fn      FX_ACCLOG_Task
+ *
+ * @brief   访问履历上传任务（主循环调用）
+ *
+ * @param   无
+ *
+ * @return  无
+ *
+ * @note    添加路径 FX_ACCLOG_AddRecord() 只置标志；带 Delay_Ms 的串口写统一放在这里，
+ *          避免在 socket 事件处理（如 TCP 建链回调）里阻塞最多 8×50ms。
+ */
+void FX_ACCLOG_Task(void)
+{
+    if (g_access_logs_dirty == 0u) {
+        return;
+    }
+    WCHNET_UpdateAccLog();      /* 内部完成后会清标志 */
 }
  
 /*********************************************************************
@@ -329,12 +368,10 @@ static void FX_ACCLOG_SendAccessTable(uint8_t Dest_Sock)
     offset = 0;
 
     if (FIFO_GetCount(&g_access_fifo) > 0) {
-        /* 重置读取位置到最新记录 */
-        FX_ACCLOG_ResetReadPos();
-        
-        /* 显示最新记录 */
+        /* ★ 显示最新记录：按龄访问(age 0 = 最新)，不再操作 FIFO 共享游标 ——
+         *   渲染无副作用，也不会与"上传 PLC"互相偷记录。 */
         fx_acclog_record_t latest_record;
-        if (FX_ACCLOG_GetNextRecord(&latest_record)) {
+        if (FIFO_GetByAge(&g_access_fifo, 0u, &latest_record)) {
             offset += HTML_PACK(temp_buffer, offset,
                     "<tr>\r\n"
                     "<td class=\"ct\">最新</td>\r\n"
@@ -361,10 +398,12 @@ static void FX_ACCLOG_SendAccessTable(uint8_t Dest_Sock)
             row_count++;
         }
         
-        /* 显示剩余记录 */
+        /* 显示剩余记录：序号 record_index 对应 age（与"最新"行同为时间倒序）。
+         * 范围判断放在前面：原写法先取记录再判范围，会在最后一次多消费一条。 */
         fx_acclog_record_t record;
         uint8_t record_index = 1;
-        while (FX_ACCLOG_GetNextRecord(&record) && record_index < rows) {
+        while (record_index < rows &&
+               FIFO_GetByAge(&g_access_fifo, record_index, &record)) {
             offset += HTML_PACK(temp_buffer, offset,
                     "<tr>\r\n"
                     "<td class=\"ct\">%d</td>\r\n"

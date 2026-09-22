@@ -309,7 +309,21 @@ void ethernet_error_code_ack (uint8_t Sour_Sock,uint8_t Dest_Sock,uint8_t sub_he
     if( socket_p->Error_Code ){
         wizchip_updata_socket_to_PLC(Sour_Sock, 1 ); //更新socket 状态 到PLC 
     }    
-   
+
+    /* ★ 错误履历(F1)：本函数是"模块向客户端回错误应答"的唯一收口点，
+     *   在这里落一条履历，字段全部取自 socket 上下文：
+     *     连接号 = SockID ｜ 协议 = Eth_Type(TCP/UDP) ｜ 开放方式 = Pro_Type(0xA0~0xA9)
+     *     ｜ 本站端口 ｜ 错误代码 ｜ 对象IP·端口 ｜ 指令代码 = MC 子标题
+     *   注意：AddRecord 只做内存写入 + 置"待上传"标志（可在事件上下文安全调用），
+     *   带延时的串口上传统一由主循环 FX_ErrorLogs_Task() 完成。 */
+    FX_ENETINF_ACCLOG_AddRecord((uint16_t)Sour_Sock,
+                                (uint8_t)socket_p->Eth_Type,
+                                (uint8_t)socket_p->Pro_Type,
+                                socket_p->local_port,
+                                (socket_p->Error_Code != 0u) ? socket_p->Error_Code : (uint16_t)code,
+                                socket_p->destip,
+                                socket_p->destport,
+                                sub_header);
 }
 
 
@@ -1959,6 +1973,12 @@ void ethernet_app_task(void)
     static NET_INIT_STATE net_state = NET_INIT_STATE_START; // 网口初始化流程状态
     static uint32_t uart_time = 0;
     static uint32_t uart_time_cnt = 0;
+
+    /* ★ 履历上传（主循环上下文）：有新记录就按配置写入 PLC 寄存器。
+     *   放在这里而不是添加路径，是为了避免在 socket 事件/中断上下文做带延时的串口写
+     *   （两个模块原先都在事件回调里 Delay_Ms(50)×N）。 */
+    FX_ACCLOG_Task();       /* 访问履历 */
+    FX_ErrorLogs_Task();    /* 错误履历 */
     uint32_t uart_time_new = synch_state_time/500;          // 单位（10ms）
     
     switch ( net_state )

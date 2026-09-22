@@ -69,6 +69,8 @@ uint8_t FX_ACCLOG_GetRecordCount(void);
 void FX_ACCLOG_UpdateMonitor(void);
  
 void WCHNET_UpdateAccLog(void);
+/* 主循环调用：有未上传的访问履历就写入 PLC（添加路径只置标志，不在这里做带延时的串口写） */
+void FX_ACCLOG_Task(void);
 
 #ifdef __cplusplus
 }

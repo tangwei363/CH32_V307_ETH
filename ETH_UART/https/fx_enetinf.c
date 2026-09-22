@@ -67,6 +67,8 @@ static void FX_ENETINF_UpdateLEDs(void)
  
 fx_enetinf_error_log_t g_error_logs[FX_ENETINF_MAX_ERRORS];
 fifo_queue_t g_error_fifo = {0};
+/* 1 = 队列里有尚未上传到 PLC 的履历（由添加路径置位，主循环 FX_ErrorLogs_Task 消费） */
+static uint8_t g_error_logs_dirty = 0;
 
 /* 静态函数声明 */
 static char* FX_ENETINF_GenerateErrorTable(void);
@@ -100,6 +102,15 @@ void FX_ENETINF_Init(void)
         qsize = FX_ENETINF_MAX_ERRORS;
     }
 
+    /* ★ L7：PLC 配置的件数超过本模块数组上限时这里静默钳位 —— 明确告警一次，
+     *   否则用户没法知道"配置没有完全生效"（页面只会显示 8 行）。
+     *   注意：本函数只在开机(WRITE_PHY_CHANGE → MITSU_HTTP_Init)调用一次；
+     *   若运行期 PLC 侧改了件数，需重新调用本函数，队列长度才会跟随。 */
+    if (log_data.error_log_target_cnt > FX_ENETINF_MAX_ERRORS) {
+        HTTPS_DEBUG("错误履历配置 %d 条 > 上限 %d，已按上限生效\r\n",
+                    (int)log_data.error_log_target_cnt, (int)FX_ENETINF_MAX_ERRORS);
+    }
+
     FIFO_Init(&g_error_fifo, g_error_logs, sizeof(fx_enetinf_error_log_t), qsize);
 
     HTTPS_DEBUG("FX3U-ENET-ADP信息模块初始化完成\r\n");
@@ -115,12 +126,10 @@ void FX_ENETINF_Init(void)
  *
  * @return  无
  */
-void FX_ENETINF_GetRecord(uint8_t index, fx_enetinf_error_log_t *record)
-{
-    if (index < FX_ENETINF_MAX_ERRORS && record != NULL) {
-        memcpy(record, &g_error_logs[index], sizeof(fx_enetinf_error_log_t));   
-    }
-}
+/* 说明：原 FX_ENETINF_GetRecord() 按"物理槽位"直读 g_error_logs[index]，与 FIFO 的
+ * "按时间倒序"语义冲突（回绕后取到的是不同记录，且当队列容量 < FX_ENETINF_MAX_ERRORS 时
+ * 会读到从未写过的槽位）。该函数无任何调用者，已删除；需要取记录请用
+ * FX_ENETINF_GetErrorLog()（按龄：0 = 最新）。 */
 
 /*********************************************************************
  * @fn      FX_ENETINFACCLOG_AddRecord
@@ -145,6 +154,10 @@ void FX_ENETINF_ACCLOG_AddRecord(uint16_t conn_id, uint8_t protocol, uint8_t ope
         return;
     }
     fx_enetinf_error_log_t record;
+
+    /* ★ 必须先整体清零：reserved_1/reserved_2(约定 0x0000) 以及结构体的填充字节
+     *   会被"原样"写入 PLC 的履历区，未初始化时写进去的是栈上垃圾。 */
+    memset(&record, 0, sizeof(record));
     // 更新RTC实时时钟       
     RTC_Get();
     record.log_time.year = calendar.w_year;
@@ -155,7 +168,11 @@ void FX_ENETINF_ACCLOG_AddRecord(uint16_t conn_id, uint8_t protocol, uint8_t ope
     record.log_time.second = calendar.sec;
     record.conn_id = conn_id;  // 连接号 
     record.protocol = protocol; // 协议类型 TCP / UDP
-    record.open_type = 0x02FF & open_type; // 开放方式 
+    /* 开放方式：直接用调用方给的 Pro_Type 原始编码(0xA0/0xA6/0xA8/0xA9…)。
+     * 原实现写成 "0x02FF & open_type" 属无意义掩码(形参已是 uint8_t)，
+     * 若调用方按 PLC 的 0x02xx 编码传入还会把高位截断，使页面显示退化成 "----"。
+     * "编码 -> 文本"的映射交给显示侧的 FX_ENETINF_OpenStr()。 */
+    record.open_type = open_type; // 开放方式 
     record.local_port = local_port; // 本站端口号 
     record.error_code = error_code; // 错误代码 
     record.remote_port = remote_port; // 通信对象端口号 
@@ -164,6 +181,10 @@ void FX_ENETINF_ACCLOG_AddRecord(uint16_t conn_id, uint8_t protocol, uint8_t ope
     
     /* 添加新记录到队列 */
     FIFO_AddRecord(&g_error_fifo, &record);
+
+    /* ★ 有新错误 ? 置"待上传"标志，真正的串口上传交给主循环 FX_ErrorLogs_Task()：
+     *   本函数可能在 socket 事件/中断上下文被调用，不允许在这里做带延时的串口写。 */
+    g_error_logs_dirty = 1;
 }
 
 /*********************************************************************
@@ -176,29 +197,17 @@ void FX_ENETINF_ACCLOG_AddRecord(uint16_t conn_id, uint8_t protocol, uint8_t ope
  *
  * @return  无
  */
-void FX_ENETINF_GetErrorLog(uint8_t index, fx_enetinf_error_log_t *log)
+uint8_t FX_ENETINF_GetErrorLog(uint8_t index, fx_enetinf_error_log_t *log)
 {
-    if (index < FX_ENETINF_MAX_ERRORS && log != NULL) {
-        if (FIFO_GetCount(&g_error_fifo) > 0) {
-            /* 重置读取位置到最新记录 */
-            FIFO_ResetReadPos(&g_error_fifo);
-            
-            /* 遍历队列，找到指定索引的记录 */
-            fx_enetinf_error_log_t temp_log;
-            uint8_t i = 0;
-            
-            while (i <= index && FIFO_GetNextRecord(&g_error_fifo, &temp_log)) {
-                if (i == index) {
-                    memcpy(log, &temp_log, sizeof(fx_enetinf_error_log_t));
-                    break;
-                }
-                i++;
-            }
-        } else {
-            /* 队列为空，返回空记录 */
-            memset(log, 0, sizeof(fx_enetinf_error_log_t));
-        }
+    if (log == NULL) {
+        return 0;
     }
+    /* ★ 关键修正：取不到记录时必须清零输出。
+     *   原实现在"队列不足 index+1 条"时直接跳出循环、不写 log，调用方会继续使用
+     *   未初始化或上一次遗留的数据（显示脏记录）。
+     *   另外改为"按龄访问"(age 0 = 最新)，不再依赖 FIFO 的全局游标 ? 渲染/上传互不干扰。 */
+    memset(log, 0, sizeof(fx_enetinf_error_log_t));
+    return FIFO_GetByAge(&g_error_fifo, index, log);
 }
 
 /*********************************************************************
@@ -252,30 +261,76 @@ void FX_ENETINF_ClearErrorLogs(void)
  */
 void FX_ErrorLogs_SendAccess_PLC(void)
 {
-    /* 设置时间设置结果的存储目标类型 */
-    ETHERNET_DEBUG(" 同步 PLC 设置时间设置结果的存储目标类型 \r\n ");
-    // 软元件范围（800:0x0320，高低互换）
-    net_mc_meta.start_device = log_data.error_log_target_cnt;  
-    //（记录件数）(1~ 16)
-    net_mc_meta.device_count = sizeof(fx_enetinf_error_log_t);
+    uint8_t  count, limit, i;
+    uint16_t start_device;
+    uint16_t record_words;
     fx_enetinf_error_log_t record;
-    // 遍历队列中的记录
-    while (FX_ErrorLogs_GetNextRecord(&record)) {
-        // 处理记录
-        // 时间设置结果存储目标寄存器类型（01:D寄存器，02:R寄存器）
-        if (log_data.error_log_target_reg == 0x02) {
-            MELSEC_FX_Build_E16_write_R_Cmd(0xFF , 0xFF, net_mc_meta.start_device, 
-                        (uint16_t*)&record, net_mc_meta.device_count);
-        } else if (log_data.error_log_target_reg == 0x01){ 
-            MELSEC_FX_BuildE10WriteParamCmd(0xFF , 0xFF, net_mc_meta.start_device,
-                        (uint16_t*)&record, net_mc_meta.device_count);
-        }
-        net_mc_meta.start_device += net_mc_meta.device_count;
-        Delay_Ms(100);//等待发送完成
-    }
-    // 重置读取位置到最新记录
-    FX_ErrorLogs_ResetReadPos();
 
+    /* ① 未使能（件数为 0 / 寄存器类型非法）立即返回：不做任何串口动作与延时 */
+    if (log_data.error_log_target_cnt == 0u || log_data.error_log_target_reg == 0u) {
+        g_error_logs_dirty = 0;
+        return;
+    }
+
+    count = FIFO_GetCount(&g_error_fifo);
+    if (count == 0u) {
+        g_error_logs_dirty = 0;
+        return;
+    }
+
+    /* ② 上传条数不超过 PLC 配置的记录件数（原实现把队列全部写出，会超出 PLC 的履历区） */
+    limit = (count < log_data.error_log_target_cnt) ? count : log_data.error_log_target_cnt;
+
+    /* ③ 起始地址必须用"软元件范围"字段 error_log_index。
+     *    原实现写成 log_data.error_log_target_cnt（件数），于是写到 D1/D2… 一带，
+     *    把无关寄存器当履历区覆盖 —— 这是与访问履历(WCHNET_UpdateAccLog)对照后
+     *    确认的复制粘贴错误。 */
+    start_device = log_data.error_log_index;
+
+    /* ④ 单条长度必须换算成"字数"：MELSEC_FX_BuildE1x 的 count 是软元件点数(字)，
+     *    直接用 sizeof() 得到的是字节数 ? 每条多写一倍，越界污染 PLC 寄存器。
+     *    本模块履历布局 = 17 字(含开放方式)，与 ethernet_app.h 的 eth_err_log_t 注释一致。 */
+    record_words = (uint16_t)(sizeof(fx_enetinf_error_log_t) / sizeof(uint16_t));
+
+    /* ⑤ 按龄遍历(0 = 最新)，写入 PLC 时也是一条接一条顺序排列 */
+    for (i = 0; i < limit; i++) {
+        if (!FIFO_GetByAge(&g_error_fifo, i, &record)) {
+            break;
+        }
+        if (log_data.error_log_target_reg == 0x02) {          /* R 寄存器 */
+            MELSEC_FX_Build_E16_write_R_Cmd(0xFF, 0xFF, start_device,
+                                            (uint16_t *)&record, record_words);
+        } else {                                              /* D 寄存器(默认) */
+            MELSEC_FX_BuildE10WriteParamCmd(0xFF, 0xFF, start_device,
+                                            (uint16_t *)&record, record_words);
+        }
+        start_device += record_words;
+        Delay_Ms(50);                                         /* 等本帧发出（主循环上下文） */
+    }
+
+    g_error_logs_dirty = 0;
+    HTTPS_DEBUG("错误履历上传PLC: %d 条, 起始=%d, 每条=%d 字\r\n",
+                limit, (int)log_data.error_log_index, (int)record_words);
+}
+
+/*********************************************************************
+ * @fn      FX_ErrorLogs_Task
+ *
+ * @brief   错误履历上传任务（主循环调用）：有未上传的履历就写入 PLC 寄存器
+ *
+ * @param   无
+ *
+ * @return  无
+ *
+ * @note    添加路径可能运行在 socket 事件/中断上下文，只置 g_error_logs_dirty；
+ *          带 Delay_Ms 的串口上传统一放到这里（主循环），避免阻塞事件回调。
+ */
+void FX_ErrorLogs_Task(void)
+{
+    if (g_error_logs_dirty == 0u) {
+        return;
+    }
+    FX_ErrorLogs_SendAccess_PLC();      /* 内部完成后会清标志 */
 }
  
 /*********************************************************************
@@ -339,15 +394,29 @@ static char* FX_ENETINF_GenerateErrorTable(void)
            "<td width=\"110\">年月日</td>\r\n"
            "<td width=\"70\">时间</td>\r\n"
            "</tr>\r\n");
+
+    /* ★ L7 页面提示：PLC 侧配置的履历件数超过本机数组上限时明确告知 ——
+     *   否则用户会以为"页面少了记录"或页面故障（本机只保留最新 FX_ENETINF_MAX_ERRORS 条）。
+     *   colspan 必须等于表头列数（11：空列+连接号+协议+开放方式+本站端口号+错误代码
+     *   +通信对象IP+通信对象端口号+指令代码+年月日+时间）。 */
+    if (log_data.error_log_target_cnt > FX_ENETINF_MAX_ERRORS) {
+        /* MITSU_HTTP_Emit() 不是可变参数函数，先 sprintf 到 HtmlBuffer 再提交 */
+        sprintf(temp_buffer,
+                "<tr bgcolor=\"#fff3cd\">\r\n"
+                "<td colspan=\"11\">注意：PLC 配置的错误履历件数为 %d，"
+                "本机仅保留最新 %d 条（超出部分不显示）。</td>\r\n"
+                "</tr>\r\n",
+                (int)log_data.error_log_target_cnt,
+                (int)FX_ENETINF_MAX_ERRORS);
+        MITSU_HTTP_Emit(temp_buffer);
+    }
     
     /* 生成错误履历行 */
     if (FIFO_GetCount(&g_error_fifo) > 0) {
-        /* 重置读取位置到最新记录 */
-        FIFO_ResetReadPos(&g_error_fifo);
-        
-        /* 显示最新记录 */
+        /* ★ 显示最新记录：按龄访问(age 0 = 最新)，不再操作 FIFO 的全局游标 ——
+         *   这样"渲染"没有副作用，也不会与"上传 PLC"互相偷记录。 */
         fx_enetinf_error_log_t latest_log;
-        if (FIFO_GetNextRecord(&g_error_fifo, &latest_log)) {
+        if (FIFO_GetByAge(&g_error_fifo, 0u, &latest_log)) {
             sprintf(temp_buffer,
                     "<tr>\r\n"
                     "<td>最新</td>\r\n"
@@ -355,7 +424,7 @@ static char* FX_ENETINF_GenerateErrorTable(void)
                     "<td>%s</td>\r\n"
                     "<td>%s</td>\r\n"
                     "<td>%d</td>\r\n"
-                    "<td>%d</td>\r\n"
+                    "<td>%04X</td>\r\n"
                     "<td>%d.%d.%d.%d</td>\r\n"
                     "<td>%d</td>\r\n"
                     "<td>%d</td>\r\n"
@@ -376,10 +445,12 @@ static char* FX_ENETINF_GenerateErrorTable(void)
             MITSU_HTTP_Emit( temp_buffer);
         }
         
-        /* 显示剩余记录 */
+        /* 显示剩余记录：表行号 2..N 依次对应 age 1..N-1（仍是"最新在前"的时间倒序）。
+         * 注意把范围判断放在前面：原写法先取记录再判范围，会在最后一次多消费一条。 */
         fx_enetinf_error_log_t log;
         uint8_t log_index = 2;
-        while (FIFO_GetNextRecord(&g_error_fifo, &log) && log_index <= FX_ENETINF_MAX_ERRORS) {
+        while (log_index <= FX_ENETINF_MAX_ERRORS &&
+               FIFO_GetByAge(&g_error_fifo, (uint8_t)(log_index - 1u), &log)) {
             sprintf(temp_buffer,
                     "<tr>\r\n"
                     "<td>%d</td>\r\n"
@@ -387,7 +458,7 @@ static char* FX_ENETINF_GenerateErrorTable(void)
                     "<td>%s</td>\r\n"
                     "<td>%s</td>\r\n"
                     "<td>%d</td>\r\n"
-                    "<td>%d</td>\r\n"
+                    "<td>%04X</td>\r\n"
                     "<td>%d.%d.%d.%d</td>\r\n"
                     "<td>%d</td>\r\n"
                     "<td>%d</td>\r\n"
