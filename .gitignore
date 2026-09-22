@@ -81,3 +81,14 @@ JLinkSettings.ini
 !LICENSE.txt
 !CHANGELOG.md
 
+ETH_UART/obj/callgraph.dot
+ETH_UART/obj/makefile
+ETH_UART/obj/Core/subdir.mk
+ETH_UART/obj/Debug/subdir.mk
+ETH_UART/obj/NetLib/subdir.mk
+ETH_UART/obj/Peripheral/src/subdir.mk
+ETH_UART/obj/Startup/subdir.mk
+ETH_UART/obj/User/subdir.mk
+ETH_UART/obj/https/subdir.mk
+ETH_UART/obj/melsec_fx/subdir.mk
+ETH_UART/obj/modbus/subdir.mk
