@@ -1468,6 +1468,7 @@ void Web_Server(uint8_t Sour_Sock ,uint8_t  Dest_Sock, uint8_t *socket_buffer,ui
                     current_page = HTML_PAGE_STATUS ;  /* 标记页面已处理 */
                 }
                 else if(strstr(name, "fx_plcinf.html") != NULL || strstr(name, "fx_plcinf") != NULL) {
+                    HTTPS_HandleMonitorCmd((char*)socket_buffer);   /* 监视开始/停止按钮 -> 切换监视状态 */
                     FX_PLCINF_SendWebPage(Sour_Sock,Dest_Sock, (char*)name);
                     current_page = HTML_PAGE_PLCINF;  /* 标记页面已处理 */
                 }
@@ -1612,6 +1613,23 @@ void Web_Usart_Handler(uint8_t Sour_Sock ,uint8_t  Dest_Sock, uint8_t *buffer,ui
             break;
         case HTML_PAGE_PLCINF:
             HTTPS_DEBUG("fx_plcinf.html \r\n");
+            /* ★ M8000~M8015 状态字回帧：解析后刷新 RUN/BATT/ERROR 指示灯。
+             * 解码方式与 devmon 分支相同：跳过 STX(buffer+1)，ASCII 十六进制→二进制，
+             * 字节数 = (帧长-4)/2。回帧路径只更新 LED 状态、不重发页面
+             * (浏览器每 5s 元刷新重新请求本页，届时用新状态渲染)。 */
+            if (lend > 4u) {
+                /* 独立静态缓冲：不占用 HtmlBuffer(渲染缓冲)，避免回帧撞上页面组包 */
+                static uint8_t s_plc_status_data[8];
+                uint16_t dlen = (uint16_t)((lend - 4u) / 2u);
+                dlen &= 0xFFFEu;                          /* 该转换要求长度为偶数 */
+                if (dlen > (uint16_t)sizeof(s_plc_status_data)) {
+                    dlen = (uint16_t)sizeof(s_plc_status_data);
+                }
+                if (dlen >= 2u) {
+                    hex_str_to_intlend(buffer + 1, dlen, s_plc_status_data);
+                    FX_PLCINF_OnStatusReply(s_plc_status_data, dlen);
+                }
+            }
             break;
         case HTML_PAGE_ENETINF:
             HTTPS_DEBUG("fx_enetinf.html \r\n");

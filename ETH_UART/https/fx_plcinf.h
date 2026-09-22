@@ -84,6 +84,10 @@ void FX_PLCINF_Init(void);
 void FX_PLCINF_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,char *url);
  
 void FX_PLCINF_GetError(uint8_t index, fx_plcinf_error_t *error);
+
+/* PLC 状态位(M8000~M8015)读取与 LED 刷新 */
+void FX_PLCINF_RequestStatus(uint8_t Sour_Sock, uint8_t Dest_Sock);
+void FX_PLCINF_OnStatusReply(const uint8_t *data, uint16_t len);
  
  
  

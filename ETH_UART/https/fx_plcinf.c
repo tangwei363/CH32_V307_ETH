@@ -17,6 +17,9 @@
 
 #include "bsp_rtc.h"
 #include "ethernet_app.h"
+#include "melsec_fx_tables.h"   /* MC_FX_M：M 软元件编码 */
+#include "melsec_fx_core.h"     /* MELSEC_FX_BuildE00ReadCmd：字单位成批读出 */
+#include "melsec_fx_net.h"      /* net_mc_meta：MC 协议请求上下文 */
 /* 全局变量定义 */
 #define FX_PLCINF_TABLE_ROWS  11
 static fx_plcinf_info_t g_plc_info;
@@ -220,6 +223,98 @@ static const char* FX_PLCINF_LEDClass(fx_plcinf_led_state_t st)
     return "off";
 }
 
+/* ══════════════════════════════════════════════════════════════════
+ * PLC 状态位(M8000~M8015 一个字)驱动 LED
+ *
+ * 位序（三菱约定，与 ethernet_app.c 的 wizchip_Analysis_M_info 一致）：
+ *   状态字的 bit j = M(8000 + j)
+ *     M8000 -> RUN   灯：1=点亮(绿)，0=熄灭
+ *     M8004 -> ERROR 灯：1=点亮(红，错误发生)
+ *     M8005 -> BATT  灯：1=点亮(红，电池电压低)
+ *     POWER 灯固定常亮(绿)，不依赖 PLC 状态
+ *
+ * 取数方式：M 是位软元件，按"字单位"读 1 点 = 16 位(正好覆盖 M8000~M8015)，
+ *           与软元件监视页(fx_devmon)读 M 的方式完全一致。
+ * 刷新时机：页面渲染时(监视执行中)发起一次读；UART 回帧到达后由
+ *           HTTPS.c 的 Web_Usart_Handler(HTML_PAGE_PLCINF 分支)调用
+ *           FX_PLCINF_OnStatusReply() 更新 LED，浏览器每 5s 元刷新即看到新状态。
+ * ══════════════════════════════════════════════════════════════════ */
+#define FX_PLCINF_STATUS_ADDR     8000u   /* M8000 */
+#define FX_PLCINF_STATUS_POINTS   1u      /* 1 个字 = M8000~M8015 */
+#define FX_PLCINF_BIT_RUN         0u      /* M8000 */
+#define FX_PLCINF_BIT_ERROR       4u      /* M8004 */
+#define FX_PLCINF_BIT_BATT        5u      /* M8005 */
+
+static uint16_t g_plc_status       = 0;   /* 最近一次读到的状态字 */
+static uint8_t  g_plc_status_valid = 0;   /* 是否成功读到过 */
+static uint8_t  g_plc_req_busy     = 0;   /* 有一次读在途：避免请求堆积 */
+
+/*********************************************************************
+ * @fn      FX_PLCINF_RequestStatus
+ *
+ * @brief   发起一次 M8000~M8015 读取（仅"监视执行中"；每次页面渲染调一次）
+ *
+ * @param   Sour_Sock - 请求来源 socket
+ * @param   Dest_Sock - 目的 socket（回帧时按此 socket 的页面路由回来）
+ *
+ * @return  none
+ */
+void FX_PLCINF_RequestStatus(uint8_t Sour_Sock, uint8_t Dest_Sock)
+{
+    if (net_monitor_state != FX_MONITOR_RUNNING) {
+        g_plc_req_busy = 0;                    /* 监视停止：解除在途标志 */
+        return;
+    }
+    if (g_plc_req_busy) {
+        return;                                /* 上一帧还没回来，先不重复发 */
+    }
+
+    net_mc_meta.device_name  = MC_FX_M;
+    net_mc_meta.start_device = FX_PLCINF_STATUS_ADDR;
+    net_mc_meta.device_count = FX_PLCINF_STATUS_POINTS;
+
+    g_plc_req_busy = 1;
+    MELSEC_FX_BuildE00ReadCmd(Sour_Sock, Dest_Sock,
+                              FX_PLCINF_STATUS_ADDR, FX_PLCINF_STATUS_POINTS);
+    printf("PLC信息页: 读取 M8000~M8015(1 字)\r\n");
+}
+
+/*********************************************************************
+ * @fn      FX_PLCINF_OnStatusReply
+ *
+ * @brief   处理 M8000~M8015 回帧，刷新 LED（POWER 常亮，RUN/BATT/ERROR 由状态位驱动）
+ *
+ * @param   data - 已由 ASCII 十六进制解码为二进制的数据区(低位字在前)
+ *          len  - 数据字节数
+ *
+ * @return  none
+ */
+void FX_PLCINF_OnStatusReply(const uint8_t *data, uint16_t len)
+{
+    uint16_t word;
+
+    g_plc_req_busy = 0;                        /* 无论成败都解除在途标志 */
+    if (data == NULL || len < 2u) {
+        printf("PLC信息页: 状态回帧过短(len=%u)\r\n", len);
+        return;
+    }
+
+    word = (uint16_t)((uint16_t)data[0] | ((uint16_t)data[1] << 8));
+    g_plc_status       = word;
+    g_plc_status_valid = 1;
+
+    /* POWER 固定常亮；RUN 绿；ERROR / BATT 红 */
+    g_plc_info.led_power = FX_PLC_LED_GREEN;
+    g_plc_info.led_run   = (word & (1u << FX_PLCINF_BIT_RUN))   ? FX_PLC_LED_GREEN : FX_PLC_LED_OFF;
+    g_plc_info.led_error = (word & (1u << FX_PLCINF_BIT_ERROR)) ? FX_PLC_LED_RED   : FX_PLC_LED_OFF;
+    g_plc_info.led_batt  = (word & (1u << FX_PLCINF_BIT_BATT))  ? FX_PLC_LED_RED   : FX_PLC_LED_OFF;
+
+    printf("PLC信息页: 状态字=0x%04X  RUN=%d ERROR=%d BATT=%d\r\n", (unsigned)word,
+           (g_plc_info.led_run   != FX_PLC_LED_OFF),
+           (g_plc_info.led_error != FX_PLC_LED_OFF),
+           (g_plc_info.led_batt  != FX_PLC_LED_OFF));
+}
+
  
 /*********************************************************************
  * @fn      FX_PLCINF_SendWebPage
@@ -242,6 +337,15 @@ void FX_PLCINF_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,char *url)
     char *battery_mode_str;
  
     uint32_t offset;
+
+    /* ★ 每次渲染前：
+     *   ① RTC_Get() 取板载 RTC 的当前时间(年月日/时间实时刷新；秒中断里也在更新，
+     *      这里再取一次保证渲染瞬间是新鲜的)；
+     *   ② 监视执行中则发起一次 M8000~M8015 读取，回帧异步刷新 LED
+     *      (本页 LED 用"最近一次读到的状态"渲染，下一轮刷新即体现新值)。 */
+    RTC_Get();
+    FX_PLCINF_RequestStatus(Sour_Sock, Dest_Sock);
+
     /* 获取CPU类型字符串 */
     cpu_type_str = FX_PLCINF_GetCPUTypeString(g_plc_info.cpu_type);
     /* 获取存储器类型字符串 */
