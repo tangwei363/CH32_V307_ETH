@@ -57,8 +57,6 @@ extern u8 UART2_TX_DMA_DataBuf[UART_TX_DMA_SIZE];
 
 typedef enum { IDLE = 0, BUSY = !IDLE} Uart_TX_DMA_State;
 
-#define NET_LED_ENABLE             0        // 网络LED使能标志
-
 #define LED_RX_GPIO_RCC             RCC_APB2Periph_GPIOB
 #define LED_RX_GPIO_TypeDef         GPIOB
 #define LED_RX_GPIO_PIN             GPIO_Pin_13
@@ -75,23 +73,6 @@ typedef enum { IDLE = 0, BUSY = !IDLE} Uart_TX_DMA_State;
 extern volatile uint32_t g_ulSystemTick;
 void Tick_time_handler(void);
 uint32_t Tick_time_get(void);
-
-#if NET_LED_ENABLE == 1
-
-/* LED控制函数（优化版本，使用定时器控制闪烁） */
-void NEN_RX_LED_SetState(u8 state);       // 设置接收LED状态（1=点亮，0=熄灭）
-void NEN_TX_LED_SetState(u8 state);       // 设置发送LED状态（1=点亮，0=熄灭）
-void NEN_RX_LED_Trigger(void);            // 触发接收LED闪烁（点亮后自动熄灭）
-void NEN_TX_LED_Trigger(void);            // 触发发送LED闪烁（点亮后自动熄灭）
-void NEN_LED_Update(void);                // LED定时更新函数（需在主循环周期调用）
-
-/* 保留原有函数以兼容旧代码 */
-void NEN_RX_LED_SET(u8 Val);
-void NEN_TX_LED_SET(u8 Val);
-void NEN_RX_LED_Toggle(void);
-void NEN_TX_LED_Toggle(void);
-
-#endif //NET_LED_ENABLE 
 
 
 /*********************************************************************

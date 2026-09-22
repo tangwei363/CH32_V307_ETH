@@ -102,7 +102,7 @@ void FX_ENETINF_Init(void)
 
     FIFO_Init(&g_error_fifo, g_error_logs, sizeof(fx_enetinf_error_log_t), qsize);
 
-    printf("FX3U-ENET-ADP信息模块初始化完成\r\n");
+    HTTPS_DEBUG("FX3U-ENET-ADP信息模块初始化完成\r\n");
 }
  
 /*********************************************************************
@@ -594,7 +594,7 @@ void FX_ENETINF_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock,char *url)
     Data_Send(Dest_Sock, (uint8_t*)HTML_GetComponent(HTML_COMP_FOOTER_NEW),
               strlen(HTML_GetComponent(HTML_COMP_FOOTER_NEW)));
 
-    printf("FX3U-ENET-ADP信息页面流式发送完成\r\n");
+    HTTPS_DEBUG("FX3U-ENET-ADP信息页面流式发送完成\r\n");
 }
 
 

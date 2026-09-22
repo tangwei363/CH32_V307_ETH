@@ -58,7 +58,8 @@ typedef enum {
 /* 错误信息结构体 */
 typedef struct {
     uint8_t     error_no;      /* 错误编号 */
-    uint16_t    error_step;    /* 错误步 */
+    uint8_t     cls;           /* 错误类别下标(见 g_err_cls_name)：用于在页面上标出动作的特殊继电器 M */
+    uint16_t    error_step;    /* 错误步(来自 D8069) */
     char        error_msg[32]; /* 错误信息(64→32: 与记录数同步压缩, 回收SRAM) */
 } fx_plcinf_error_t;
 
@@ -77,7 +78,7 @@ typedef struct {
 
 } fx_plcinf_info_t;
 
-#define FX_PLCINF_MAX_ERRORS  4   /* 最大错误记录数(10→4: g_errors 由680B降至144B) */
+#define FX_PLCINF_MAX_ERRORS  8   /* 最大错误记录数(与 8+4 个错误类别对应：D8060~D8067 + D8438/D8449/D8487/D8489) */
 
 /* 函数声明 */
 void FX_PLCINF_Init(void);
@@ -88,6 +89,12 @@ void FX_PLCINF_GetError(uint8_t index, fx_plcinf_error_t *error);
 /* PLC 状态位(M8000~M8015)读取与 LED 刷新 */
 void FX_PLCINF_RequestStatus(uint8_t Sour_Sock, uint8_t Dest_Sock);
 void FX_PLCINF_OnStatusReply(const uint8_t *data, uint16_t len);
+
+/* 错误信息(D8000~D8069：D8004 + D8060~D8067 错误代码 + D8069 发生的步编号)解析 */
+void FX_PLCINF_OnErrorReply(const uint8_t *data, uint16_t len);
+
+/* 扩展错误信息(D8438~D8489：串行通信错误2 / 特殊模块 / USB / 特殊参数)解析 */
+void FX_PLCINF_OnErrorReplyExt(const uint8_t *data, uint16_t len);
  
  
  

@@ -994,9 +994,7 @@ void SX_RawSend(u8 id, const uint8_t *dataptr, uint32_t datalen)
     p = dataptr;
     totallen = datalen;
     timeout = 50;  // 最大重试次数
-    #if NET_LED_ENABLE == 1
-    NEN_TX_LED_Trigger();  // 触发发送LED闪烁
-    #endif
+
     while (totallen > 0)
     {
         len = totallen;
@@ -1155,40 +1153,7 @@ char* find_parameter_value(const char* body, const char* param_name) {
     return value;
 }
 
-// int main() {
-//     // 示例：从原始数据中提取
-//     unsigned char raw_packet[] = 
-//         "POST /fx_devmon.html HTTP/1.1\r\n"
-//         "Host: 192.168.1.250\r\n"
-//         "Content-Length: 123\r\n"
-//         "\r\n"
-//         "MONT=D&DEVT=D&DEVN=0&CMD=%BC%E0%CA%D3%BF%AA%CA%BC&MDL=0&BFMN=0&BFMV=10%BD%F8%D6%C6&INT=5&DISP=16&VAL=D&FORM=WD&BITO=F";
-    
-//     HTTPS_DEBUG("=== 从原始数据包提取请求体 ===\n");
-//     char* body = extract_body_from_raw_data(raw_packet, sizeof(raw_packet));
-    
-//     if (body != NULL) {
-//         HTTPS_DEBUG("提取的请求体: %s\n\n", body);
-        
-//         // 查找特定参数
-//         char* cmd_value = find_parameter_value(body, "CMD");
-//         if (cmd_value != NULL) {
-//             HTTPS_DEBUG("CMD参数值: %s\n", cmd_value);
-//             // 注意：这里的值是URL编码的，需要进一步解码
-//             free(cmd_value);
-//         }
-        
-//         char* bfmv_value = find_parameter_value(body, "BFMV");
-//         if (bfmv_value != NULL) {
-//             HTTPS_DEBUG("BFMV参数值: %s\n", bfmv_value);
-//             free(bfmv_value);
-//         }
-        
-//         free(body);
-//     }
-    
-//     return 0;
-// }
+ 
  
 // 从HTTP请求中提取请求体
 char* extract_http_body(const char* http_request) {
@@ -1613,21 +1578,29 @@ void Web_Usart_Handler(uint8_t Sour_Sock ,uint8_t  Dest_Sock, uint8_t *buffer,ui
             break;
         case HTML_PAGE_PLCINF:
             HTTPS_DEBUG("fx_plcinf.html \r\n");
-            /* ★ M8000~M8015 状态字回帧：解析后刷新 RUN/BATT/ERROR 指示灯。
-             * 解码方式与 devmon 分支相同：跳过 STX(buffer+1)，ASCII 十六进制→二进制，
-             * 字节数 = (帧长-4)/2。回帧路径只更新 LED 状态、不重发页面
-             * (浏览器每 5s 元刷新重新请求本页，届时用新状态渲染)。 */
+            /* ★ 本页的三个读命令由页面刷新时主动发出（FX_PLCINF_RequestStatus，用本页
+             *   socket），回帧经此分支解析：按 device_name + start_device 三路分流
+             *     M + 8000        -> M8000~M8015 状态字 -> LED
+             *     D + 8060        -> D8060~D8069 主错误块
+             *     D + 8438(其它)  -> D8438~D8489 扩展错误块
+             * 解码方式同 devmon 分支：跳过 STX，ASCII 十六进制→二进制，字节数=(帧长-4)/2。
+             * 回帧只更新数据、不重发页面（下一轮元刷新时渲染）。 */
             if (lend > 4u) {
-                /* 独立静态缓冲：不占用 HtmlBuffer(渲染缓冲)，避免回帧撞上页面组包 */
-                static uint8_t s_plc_status_data[8];
+                static uint8_t s_plc_reply_data[112];     /* 52 字 = 104B，留余量 */
                 uint16_t dlen = (uint16_t)((lend - 4u) / 2u);
                 dlen &= 0xFFFEu;                          /* 该转换要求长度为偶数 */
-                if (dlen > (uint16_t)sizeof(s_plc_status_data)) {
-                    dlen = (uint16_t)sizeof(s_plc_status_data);
+                if (dlen > (uint16_t)sizeof(s_plc_reply_data)) {
+                    dlen = (uint16_t)sizeof(s_plc_reply_data);
                 }
                 if (dlen >= 2u) {
-                    hex_str_to_intlend(buffer + 1, dlen, s_plc_status_data);
-                    FX_PLCINF_OnStatusReply(s_plc_status_data, dlen);
+                    hex_str_to_intlend(buffer + 1, dlen, s_plc_reply_data);
+                    if (uart_mc_meta.device_name == MC_FX_M) {
+                        FX_PLCINF_OnStatusReply(s_plc_reply_data, dlen);     /* M8000 状态字 */
+                    } else if (uart_mc_meta.start_device == 8060u) {
+                        FX_PLCINF_OnErrorReply(s_plc_reply_data, dlen);      /* D8060~D8069 主错误块 */
+                    } else {
+                        FX_PLCINF_OnErrorReplyExt(s_plc_reply_data, dlen);   /* D8438~D8489 扩展错误块 */
+                    }
                 }
             }
             break;

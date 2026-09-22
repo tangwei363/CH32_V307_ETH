@@ -31,6 +31,15 @@
 volatile uint32_t synch_state_time = 0;
 extern _calendar_obj calendar;
 
+/* PLC 同步缓存：由同步状态机的解析函数(wizchip_Analysis_D_info / _E1_info)写入，
+ * 网页(fx_plcinf)首屏直接读取，保证"没读到就不显示假值"。 */
+plc_sync_cache_t g_plc_cache = {0};
+
+const plc_sync_cache_t* PLC_SyncCache_Get(void)
+{
+    return &g_plc_cache;
+}
+
 net_monitor_state_t net_monitor_state = FX_MONITOR_IDLE; // 监视状态
 
 SNTP_time    sntp_time = {0};        // 时间设置
@@ -198,9 +207,7 @@ void ethernet_send(uint8_t Sour_Sock ,uint8_t  Dest_Sock, uint8_t *buf, uint16_t
     }
     ETHERNET_DEBUG("t:%ums ETHTx S_id =%d D_id = %d \n", synch_time_get() ,Sour_Sock,Dest_Sock);
     ETH_S(Sour_Sock).net_tx_packets += len;        /* net发送包数 */   
-    #if NET_LED_ENABLE == 1
-    NEN_TX_LED_Trigger();  // 触发发送LED闪烁
-    #endif //NET_LED_ENABLE == 1
+
     // 根据协议类型发送数据
     switch (ETH_S(Sour_Sock).Eth_Type) {
         case ETH_TYPE_TCP:
@@ -1052,6 +1059,8 @@ void wizchip_Analysis_E1_info(uint8_t *buf, uint16_t len,uint32_t start_dev)
         switch (start_dev)
         {
         case 0:     ETHERNET_DEBUG("总容量=总块数[%d]\r\n",resp_data); 
+            g_plc_cache.e1_blocks = resp_data;   /* 缓存总块数，供网页显示 */
+            g_plc_cache.e1_ok     = 1;
             break;
         case 2:
         {
@@ -1149,7 +1158,19 @@ void wizchip_Analysis_D_info(uint8_t *buf, uint16_t len,uint32_t start_dev)
 
         /* 根据寄存器地址更新对应的时间字段 */
         switch (start_dev) {
+            case 8001:  /* D8001：PLC 型号 + 版本(BCD)，例 0x0321 → 3.21 */
+                g_plc_cache.version = resp_data;
+                g_plc_cache.ver_ok  = 1;
+                ETHERNET_DEBUG("D8001 PLC版本=%d.%02d\r\n",
+                               (resp_data >> 8) & 0xFF, resp_data & 0xFF);
+                break;
+            case 8002:  /* D8002：内存容量(块) */
+                g_plc_cache.mem_blocks = resp_data;
+                g_plc_cache.mem_ok     = 1;
+                ETHERNET_DEBUG("D8002 内存容量=%d 块\r\n", resp_data);
+                break;
             case 8003:  // D8003保存内置存储器
+                g_plc_cache.mem_type = resp_data;   /* 缓存内置存储器/存储器盒种类，供网页显示 */
                 switch (resp_data) {
                     case 0x0000:  // RAM存储器盒
                         ETHERNET_DEBUG("RAM存储器盒%04X\r\n",resp_data);
@@ -1263,6 +1284,11 @@ void Wizchip_PHY_Link_Disconnect(void)
     // 写入网络配置信息到PLC 写入串口fifo,等待完成
     net_status.bit.link_b7    = 0;          // b7: 1:Link信号ON0:Link信号OFF
 
+    /* ★ 新增：Link 断开 ? 监控状态同步置为"停止"。
+     *   物理链路已经断了，PLC 数据不可能取到，页面上的"状态"必须与实际一致：
+     *   各页面显示"已停止"，也不再注入自动刷新/不再发 PLC 读命令；
+     *   重新插好网线后需用户再次点击"监视开始"（与本机行为一致）。 */
+    net_monitor_state = FX_MONITOR_STOPPED;
 }
 
 /**
@@ -1472,6 +1498,24 @@ void sim_Process_local_machine (uint8_t *buf,uint16_t len)
     uint8_t parse_buf[MELSEC_FX_MAX_DATA_LEN];
     uint16_t out_len = (len - 4) / 2;
     hex_str_to_intlend(buf + 1, out_len, parse_buf);   /* 从 buf[1] 开始，每 2 个 ASCII 字符转 1 字节 */
+
+    /* ─── 运行期轮询回帧（由 MainTask 以 0xFF/0xFF 发出）：直接喂给 PLC 信息页的解析函数 ───
+     *   M8000(1 点)      -> LED 状态字
+     *   D8060(10 点)     -> 主错误块
+     *   D8438(52 点)     -> 扩展错误块
+     * 处理完即 return，不再进入下面的通用分析器（避免重复统计/误解码）。 */
+    if (device_name == MC_FX_M && start_dev == 8000u) {
+        FX_PLCINF_OnStatusReply(parse_buf, out_len);
+        return;
+    }
+    if (device_name == MC_FX_D && start_dev == 8060u) {
+        FX_PLCINF_OnErrorReply(parse_buf, out_len);
+        return;
+    }
+    if (device_name == MC_FX_D && start_dev == 8438u) {
+        FX_PLCINF_OnErrorReplyExt(parse_buf, out_len);
+        return;
+    }
 
     /* ─── 根据寄存器类型分发到不同的解析函数 ─── */
     switch (device_name)
@@ -1875,6 +1919,30 @@ int SyncStateMachine_PLC(uint8_t Index)
         wizchip_sntp_get_D8013_PLC();
         break;
     }
+    /* ── 运行期轮询命令（只读，由 MainTask 稳态每 3 秒依次发出）──
+     * 这三条是"PLC 信息页"的数据源：回帧不经过 HTTP 分支，而是由
+     * sim_Process_local_machine() 按 device_name + start_device 分流到
+     * FX_PLCINF_OnStatusReply / FX_PLCINF_OnErrorReply / FX_PLCINF_OnErrorReplyExt，
+     * 直接刷新 LED 与错误信息表 —— 页面只读缓存，首屏即有数据。 */
+    case 17: /* M8000~M8015：LED 状态字(RUN=M8000 / ERROR=M8004 / BATT=M8005) */
+        net_mc_meta.device_name  = MC_FX_M;
+        net_mc_meta.start_device = 8000;
+        net_mc_meta.device_count = 1;               /* 1 个字 = 16 位(含 M8008~M8015 备用) */
+        MELSEC_FX_BuildE00ReadCmd(0xFF, 0xFF, 8000, 1);
+        break;
+    case 18: /* D8060~D8069：主错误块(D8060~D8067 错误码 + D8069 发生的步编号，共 20 字节)
+              *   注：D8001~D8003/D8004 已由开机 case 2 的 D8000+127 点读取并落缓存 */
+        net_mc_meta.device_name  = MC_FX_D;
+        net_mc_meta.start_device = 8060;
+        net_mc_meta.device_count = 10;
+        MELSEC_FX_BuildE00ReadCmd(0xFF, 0xFF, 8060, 10);
+        break;
+    case 19: /* D8438~D8489：扩展错误块(串行通信错误2 / 特殊模块 / USB / 特殊参数) */
+        net_mc_meta.device_name  = MC_FX_D;
+        net_mc_meta.start_device = 8438;
+        net_mc_meta.device_count = 52;
+        MELSEC_FX_BuildE00ReadCmd(0xFF, 0xFF, 8438, 52);
+        break;
     default:
     
         return -1;
@@ -1887,8 +1955,6 @@ int SyncStateMachine_PLC(uint8_t Index)
 
 void ethernet_app_task(void)
 {
-    /* Modbus 从站周期任务：在途事务超时检测（串口无响应时回异常码 0x0B） */
-    MB_Slave_Tick();
 
     static NET_INIT_STATE net_state = NET_INIT_STATE_START; // 网口初始化流程状态
     static uint32_t uart_time = 0;
@@ -1906,6 +1972,7 @@ void ethernet_app_task(void)
             /* wizchip init */
             net_state = NET_INIT_STATE_READ_EE;
             eth_socket_init_flg = 0;            // 获取PLC的网络信息标志位
+            g_plc_cache.state = PLC_SYNC_STATE_RUNNING;   /* 上电同步开始：网页可显示"同步中" */
             uart_time = uart_time_new;
         }break;
 
@@ -1923,7 +1990,7 @@ void ethernet_app_task(void)
                 plc_cmd_index++;
             }
             /* 所有命令发送完成(index 0~13, 共14条), 进入WAIT_EE状态 */
-            if (plc_cmd_index > 16) {
+            if (plc_cmd_index > 19) {
                 plc_cmd_index = 0;
                 plc_cmd_sent = 0;
                 plc_cmd_retry ++;
@@ -1931,9 +1998,13 @@ void ethernet_app_task(void)
                     /* PLC网络信息已获取，重置同步状态并跳转 */
                     net_state = NET_INIT_STATE_WAIT_EE;
                     plc_cmd_retry = 0;
+                    g_plc_cache.state      = PLC_SYNC_STATE_OK;    /* 同步成功：网页用缓存显示真实值 */
+                    g_plc_cache.fail_round = 0;
                 }else if ( plc_cmd_retry > 3) {
                     ethernet_info_default();       //   默认配置
                     net_state = NET_INIT_STATE_WAIT_EE;
+                    g_plc_cache.fail_round = plc_cmd_retry;        /* 连续失败轮数 */
+                    g_plc_cache.state      = PLC_SYNC_STATE_FAIL;  /* 同步失败：网页降级显示"同步失败" */
                     plc_cmd_retry = 0;
                 }
                 uart_time = uart_time_new;
@@ -2070,6 +2141,11 @@ void ethernet_app_task(void)
             {
                 WCHNET_HandleGlobalInt();
             } 
+
+            /* 说明：这里不再做常驻轮询。PLC 信息页(LED/错误信息)的数据改为
+             * "页面刷新时主动请求"——见 fx_plcinf.c 的 FX_PLCINF_RequestStatus()，
+             * 网页实时性要求不高，有请求再更新即可，也省下常驻串口流量。
+             * 本条只读命令仍保留在 SyncStateMachine_PLC 的 case 17/18/19（上电同步会各跑一次）。 */
 
         }break;
 

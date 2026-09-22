@@ -422,9 +422,6 @@ int8_t sntp_execute_retry(uint8_t socketid)
         SNTP_DEBUG("IP:%03d.%03d.%03d.%03d  \r\n",
                     NTPformat.dstaddr[0],NTPformat.dstaddr[1],
                     NTPformat.dstaddr[2],NTPformat.dstaddr[3]);
-        #if NET_LED_ENABLE == 1            
-        NEN_TX_LED_Trigger();  // ¥•∑¢∑¢ÀÕLED…¡À∏
-        #endif
     }
     else
     {

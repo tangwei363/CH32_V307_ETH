@@ -457,6 +457,33 @@ void FX_ENETINF_SetMonitorState(net_monitor_state_t state);
 void ethernet_app_loopback(void);
 void ethernet_info_handler( uint8_t *buf, uint16_t len ,uint32_t offset_addr );
 void WCHNET_Create_Socket_info( void );
+
+/* ── PLC 同步缓存（上电同步状态机读到的 PLC 参数，供网页"首屏直接显示"） ──
+ * 设计要点：
+ *   ① 每个字段都带"有效标志"：网页只在有效时使用缓存，避免显示空白或硬编码占位值；
+ *   ② 同步状态机每轮同步都会刷新缓存（state: 运行中/完成/失败）；
+ *   ③ 同步失败时保留上一次的有效值，网页按 state 给出"未同步 / 同步失败"的降级提示，
+ *      绝不会把没读到的参数当成真实值显示。 */
+typedef struct {
+    uint8_t  state;        /* PLC_SYNC_STATE_* */
+    uint8_t  fail_round;   /* 连续失败轮数 */
+    uint8_t  ver_ok;       /* D8001 已取得 */
+    uint8_t  mem_ok;       /* D8002/D8003 已取得 */
+    uint8_t  e1_ok;        /* E1 系统参数已取得 */
+    uint16_t version;      /* D8001：CPU 版本(BCD，例 0x0321 → 3.21) */
+    uint16_t mem_blocks;   /* D8002：内存容量(块) */
+    uint16_t mem_type;     /* D8003：内置存储器/存储器盒种类 */
+    uint16_t e1_blocks;    /* E1[0]：总块数 */
+} plc_sync_cache_t;
+
+#define PLC_SYNC_STATE_IDLE    0u   /* 未开始 */
+#define PLC_SYNC_STATE_RUNNING 1u   /* 同步中 */
+#define PLC_SYNC_STATE_OK      2u   /* 同步完成（缓存有效） */
+#define PLC_SYNC_STATE_FAIL    3u   /* 同步失败（已按默认值继续运行） */
+
+extern plc_sync_cache_t g_plc_cache;
+
+const plc_sync_cache_t* PLC_SyncCache_Get(void);
  
 void wizchip_updata_socket_to_PLC(uint8_t Sour_Sock,uint8_t link_state);
 

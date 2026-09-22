@@ -233,10 +233,6 @@ void WCHNET_UdpServerRecv(struct _SOCK_INF *socinf, u32 ipaddr, u16 port, u8 *bu
     ip_addr[2] = (u8)(ipaddr >> 16);
     ip_addr[3] = (u8)(ipaddr >> 24);
 
-#if NET_LED_ENABLE == 1
-    NEN_RX_LED_Trigger();
-#endif
-
 #ifdef _BSP_WCH_DEBUG
     WCH_DEBUG("Udp Remote IP:%d.%d.%d.%d srcport=%d len=%d socketid=%d SourPort=%d\r\n",
               ip_addr[0], ip_addr[1], ip_addr[2], ip_addr[3],
@@ -355,9 +351,6 @@ void WCHNET_ETHRx(u8 socketid)
 {
     u32 receive_len;
     SOCK_INF *SocketInf_t = &SocketInf[socketid];
-#if NET_LED_ENABLE == 1
-    NEN_RX_LED_Trigger();  // 触发接收LED闪烁
-#endif
 
     // 计算接收缓冲区的结束地址
     u32 endAddr = SocketInf_t->RecvStartPoint + SocketInf_t->RecvBufLen;
@@ -591,10 +584,7 @@ void WCHNET_HandleGlobalInt(void)
                 WCH_DEBUG("PHY Link disconnect!!!\r\n");
                 net_status.bit.link_b7 = 0;
                 Wizchip_PHY_Link_Disconnect();          // 断开PHY连接 处理
-            #if NET_LED_ENABLE == 1
-                NEN_RX_LED_SetState(0);  // 熄灭接收LED
-                NEN_TX_LED_SetState(0);  // 熄灭发送LED
-            #endif
+
             }
             #if SOCKET_PHY_LINK_EN
                 wizchip_PHY_Link_PLC( net_status.bit.link_b7 );

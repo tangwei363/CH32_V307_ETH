@@ -20,7 +20,7 @@ extern "C" {
 #define _FX_DEVMON_DEBUG            //日志模块 开关，注释掉将关闭日志输出
 
 #ifdef _FX_DEVMON_DEBUG
-    #define DEVMON_DEBUG(format, ...)  printf (format, ##__VA_ARGS__)
+    #define DEVMON_DEBUG(format, ...)  HTTPS_DEBUG (format, ##__VA_ARGS__)
 #else
     #define DEVMON_DEBUG(format, ...)
 #endif

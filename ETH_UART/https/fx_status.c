@@ -293,7 +293,7 @@ void FX_STATUS_SendWebPage(uint8_t Sour_Sock ,uint8_t  Dest_Sock, char *url)
     Data_Send(Dest_Sock, (uint8_t*)HTML_GetComponent(HTML_COMP_FOOTER_NEW),
               strlen(HTML_GetComponent(HTML_COMP_FOOTER_NEW)));
 
-    printf("通信状态页面流式发送完成\r\n");
+    HTTPS_DEBUG("通信状态页面流式发送完成\r\n");
 }
 
   

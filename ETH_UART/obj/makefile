@@ -59,7 +59,7 @@ main-build: ETH_UART.elf secondary-outputs
 
 # Tool invocations
 ETH_UART.elf: $(OBJS) $(USER_OBJS_ESCAPE)
-	@	riscv-none-embed-gcc -march=rv32imacxw -mabi=ilp32 -msmall-data-limit=8 -msave-restore -fmax-errors=20 -fdump-rtl-expand -Os -fmessage-length=0 -fsigned-char -ffunction-sections -fdata-sections -fno-common -Wunused -Wuninitialized -g -T "d:\XQ_Work\CH32_ETH\CH32_V307_ETH\ETH_UART\Ld\Link.ld" -nostartfiles -Xlinker --gc-sections -L"d:\XQ_Work\CH32_ETH\CH32_V307_ETH\NetLib" -Xlinker --print-memory-usage -Wl,-Map,"ETH_UART.map" --specs=nano.specs --specs=nosys.specs -o "ETH_UART.elf" $(OBJS) $(LIBS) -lprintf
+	@	riscv-none-embed-gcc -march=rv32imacxw -mabi=ilp32 -msmall-data-limit=8 -msave-restore -fmax-errors=20 -Os -fmessage-length=0 -fsigned-char -ffunction-sections -fdata-sections -fno-common -Wunused -Wuninitialized -g -T "d:\XQ_Work\CH32_ETH\CH32_V307_ETH\ETH_UART\Ld\Link.ld" -nostartfiles -Xlinker --gc-sections -L"d:\XQ_Work\CH32_ETH\CH32_V307_ETH\NetLib" -Wl,-Map,"ETH_UART.map" --specs=nano.specs --specs=nosys.specs -o "ETH_UART.elf" $(OBJS) $(LIBS) -lprintf
 ETH_UART.hex: ETH_UART.elf
 	@	riscv-none-embed-objcopy -O ihex "ETH_UART.elf" "ETH_UART.hex"
 ETH_UART.lst: ETH_UART.elf

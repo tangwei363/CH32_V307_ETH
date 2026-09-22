@@ -27,6 +27,7 @@ please refer to the "CH32V30x Evaluation Board Manual" under the CH32V307EVT\EVT
 #include "bsp_flash.h"
 #include "bsp_wch_net.h"
 #include "ethernet_app.h"
+#include "mb_slave.h"     /* MB_Slave_Tick()：Modbus 从站周期任务 */
 
 /*********************************************************************
  * @fn      IWDG_Init
@@ -112,14 +113,12 @@ int main(void)
         /* 处理网口的数据 */
         ethernet_app_task();
 
+        /* Modbus 从站周期任务：在途事务超时检测（串口无响应时回异常码 0x0B） */
+        MB_Slave_Tick();
+
     #if  SOCKET_SNTP_EN  == 1
         Sntp_client_task( net_status.bit.link_b7 );   // 获取sntp网络时间
     #endif 
-
-    #if NET_LED_ENABLE == 1
-        /* LED定时更新（需在主循环中周期调用，建议1ms周期）*/
-        NEN_LED_Update();
-    #endif
 
         IWDG_ReloadCounter();   //Feed dog
         
